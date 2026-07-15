@@ -61,3 +61,10 @@ Hermes/
 
 # Arquivo de teste manual com credenciais de desenvolvimento
 backend/tests/test_llm_live.py
+
+# Pastas e arquivos adicionais que não devem subir para o repositório principal
+Claude/
+Cria/
+Planos_Melhorias/
+CLAUDE.md
+

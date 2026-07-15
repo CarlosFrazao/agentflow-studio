@@ -265,3 +265,33 @@ async def test_call_with_fallback_text_mode() -> None:
     with mock.patch.object(llm_mod, "build_llm_chain", return_value=[FakeLLMClient(name="t")]):
         out = await call_with_fallback("s", "u", json_mode=False)
     assert out == "texto de t"
+
+
+async def test_fallback_llm_client_delegates_to_chain(monkeypatch) -> None:
+    """O adapter get_llm() deve rotear pela cadeia de fallback, não fixar Gemini.
+
+    Simula Gemini quebrado (429) e um provedor que sucede na 2a posicao;
+    o _FallbackLLMClient deve retornar o resultado do 2o sem levantar.
+    """
+    import app.services.deps as deps_mod
+    import app.services.llm as llm_mod
+    import unittest.mock as mock
+
+    class _Broken(LLMClient):
+        async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+            raise RuntimeError("429 quota")
+        async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+            raise RuntimeError("429 quota")
+
+    class _Ok(LLMClient):
+        async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+            return {"narrative": "ok", "tool_calls": []}
+        async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+            return "ok"
+
+    with mock.patch.object(llm_mod, "build_llm_chain", return_value=[_Broken(), _Ok()]):
+        client = deps_mod._FallbackLLMClient()
+        out = await client.generate_json(system_prompt="s", user_prompt="u")
+        assert out == {"narrative": "ok", "tool_calls": []}
+        txt = await client.generate_text(system_prompt="s", user_prompt="u")
+        assert txt == "ok"

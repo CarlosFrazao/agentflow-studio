@@ -12,96 +12,42 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_request_id
-from app.services.deps import get_firecrawl, get_github, get_llm, get_sra
+from app.services.deps import (
+    get_firecrawl,
+    get_github,
+    get_llm,
+    get_sandbox,
+    get_sra,
+)
 from app.core.database import get_session
 from app.core.config import get_settings
-from sqlalchemy import select
 from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.responses import success_envelope
 from app.models.artifact import Artifact
-from app.models.budget import BudgetLimit
 from app.models.card import Card
 from app.models.execution import Execution
-from app.models.project import Project
 from app.services.agents.code_research import CodeResearchAgent
 from app.services.agents.dev import DevAgent
 from app.services.agents.ideation import IdeationAgent
 from app.services.agents.planner import PlannerAgent
 from app.services.agents.research import ResearchAgent
 from app.services.agents.reviewer import ReviewerAgent
-from app.services.artifact_compressor import compress_artifact
 from app.services.orchestrator import (
     next_agent_for_column,
     next_column,
     should_auto_approve,
-    should_compress_artifact,
     column_after_review,
+)
+from app.services.pipeline_helpers import (
+    latest_artifact_content,
+    parse_ideation,
+    budget_remaining_usd,
+    maybe_compress,
 )
 
 router = APIRouter(prefix="/cards", tags=["run"])
 logger = get_logger("run_endpoint")
-
-
-async def _latest_artifact_content(session, card_id, agent_name: str) -> str | None:
-    """Retorna o conteúdo do artifact mais recente de um agente para o card."""
-    stmt = (
-        select(Artifact.content)
-        .where(Artifact.card_id == card_id, Artifact.agent_name == agent_name)
-        .order_by(Artifact.id.desc())
-        .limit(1)
-    )
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
-
-
-async def _budget_remaining_usd(session, card) -> float | None:
-    """Orçamento restante do dono do card (F-011), ou None se sem limite.
-
-    Percorre card -> project -> user -> BudgetLimit. Retorna a folga mensal
-    (`monthly_limit - current_spend`). None quando não há projeto com dono ou
-    quando não existe BudgetLimit configurado (MVP single-tenant sem cap).
-    """
-    project = await session.get(Project, card.project_id)
-    if project is None or project.user_id is None:
-        return None
-    stmt = select(BudgetLimit).where(BudgetLimit.user_id == project.user_id)
-    budget = (await session.execute(stmt)).scalar_one_or_none()
-    if budget is None:
-        return None
-    return budget.monthly_limit_usd - budget.current_month_spend_usd
-
-
-async def _maybe_compress(text: str, budget_remaining_usd: float | None) -> str:
-    """Comprime um artefato grande antes do handoff, respeitando o budget (F-011).
-
-    Fail-open: qualquer falha na compressão devolve o texto original — a
-    compressão é complementar e nunca pode derrubar o pipeline.
-    """
-    if not text:
-        return text
-    settings = get_settings()
-    if not settings.compression_enabled:
-        return text
-    if not should_compress_artifact(
-        text,
-        threshold_chars=settings.compression_threshold_chars,
-        budget_remaining_usd=budget_remaining_usd,
-    ):
-        return text
-    try:
-        compressed = await compress_artifact(
-            text, budget_tokens=settings.compression_budget_tokens
-        )
-        logger.debug(
-            "artifact_handoff_compressed",
-            original_chars=len(text),
-            compressed_chars=len(compressed),
-        )
-        return compressed
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("artifact_handoff_compression_failed", error=str(exc))
-        return text
 
 AUTO_APPROVE_REVERT_WINDOW_MIN = 30
 
@@ -117,6 +63,7 @@ async def run_card(
     sra=Depends(get_sra),
     firecrawl=Depends(get_firecrawl),
     github=Depends(get_github),
+    sandbox=Depends(get_sandbox),
 ) -> dict:
     card = await session.get(Card, card_id)
     if not card:
@@ -142,7 +89,7 @@ async def run_card(
     started = datetime.now(tz=timezone.utc)
     try:
         dispatch_result = await _dispatch(
-            agent_name, card, llm, sra, firecrawl, github, session
+            agent_name, card, llm, sra, firecrawl, github, sandbox, session
         )
         artifact_content = dispatch_result["content"]
         confidence = dispatch_result["confidence"]
@@ -253,7 +200,7 @@ async def _run_demo(card, agent_name, request_id, session) -> dict:
     )
 
 
-async def _dispatch(agent_name, card, llm, sra, firecrawl, github, session):
+async def _dispatch(agent_name, card, llm, sra, firecrawl, github, sandbox, session):
     """Roteia para o agente correto e retorna um dict:
 
     {
@@ -308,13 +255,13 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, session):
         # (research) e o output do Code Research podem ser grandes; comprime-os
         # com o modelo auxiliar barato antes do handoff, respeitando o cap de
         # orçamento (F-011).
-        budget_remaining = await _budget_remaining_usd(session, card)
-        research_content = await _latest_artifact_content(session, card.id, "research")
-        cr_content = await _latest_artifact_content(session, card.id, "code_research")
-        research_compressed = await _maybe_compress(
+        budget_remaining = await budget_remaining_usd(session, card)
+        research_content = await latest_artifact_content(session, card.id, "research")
+        cr_content = await latest_artifact_content(session, card.id, "code_research")
+        research_compressed = await maybe_compress(
             research_content or "", budget_remaining
         )
-        cr_compressed = await _maybe_compress(cr_content or "", budget_remaining)
+        cr_compressed = await maybe_compress(cr_content or "", budget_remaining)
         logger.debug(
             "planner_consuming_artifacts",
             card=str(card.id),
@@ -327,7 +274,11 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, session):
             budget_remaining=budget_remaining,
         )
         out = await PlannerAgent(llm=llm).run(
-            ideation={}, research=research_compressed, code_research=cr_compressed
+            ideation=await parse_ideation(
+                await latest_artifact_content(session, card.id, "ideation")
+            ),
+            research=research_compressed,
+            code_research=cr_compressed,
         )
         return {
             "content": out.model_dump_json(),
@@ -335,8 +286,18 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, session):
             "critical_alerts": 0,
         }
     if agent_name == "reviewer":
+        # Reviewer audita a consistência Ideia→Pesquisa→Plano→Code Research.
+        # Recebe os artifacts reais de cada agente (não vazios) — só assim ele
+        # detecta inconsistências reais entre as etapas (PRD F-005).
+        ideation_content = await latest_artifact_content(session, card.id, "ideation")
+        research_content = await latest_artifact_content(session, card.id, "research")
+        planner_content = await latest_artifact_content(session, card.id, "planner")
+        cr_content = await latest_artifact_content(session, card.id, "code_research")
         out = await ReviewerAgent(llm=llm).run(
-            ideation={}, research="", planner="", code_research=""
+            ideation=await parse_ideation(ideation_content),
+            research=research_content or "",
+            planner=planner_content or "",
+            code_research=cr_content or "",
         )
         # Roteamento pós-revisão (Item B / ADR-007): reprovado -> production,
         # aprovado c/ confiança baixa -> reviewing (HITL), aprovado alto -> done.
@@ -363,15 +324,15 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, session):
             "review_logs": out.log_summary if target_col == "production" else None,
         }
     if agent_name == "dev":
-        out = await DevAgent(llm=llm, sandbox=_NoopSandbox()).run("plano")
+        # Dev Agent consome o plano REAL do Planner Agent (não a string fixa
+        # "plano") e valida em sandbox real (DockerSandbox via get_sandbox_backend,
+        # injetável nos testes). O plano é o conteúdo do artifact "planner".
+        planner_content = await latest_artifact_content(session, card.id, "planner")
+        plan = planner_content or ""
+        out = await DevAgent(llm=llm, sandbox=sandbox).run(plan)
         return {
             "content": out.model_dump_json(),
             "confidence": 0.0,
             "critical_alerts": 0,
         }
     raise ValueError(f"agente desconhecido: {agent_name}")
-
-
-class _NoopSandbox:
-    async def validate(self, code: str) -> dict:
-        return {"success": True, "stderr": ""}

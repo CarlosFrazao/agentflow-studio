@@ -20,6 +20,21 @@ _DEV_SYSTEM = (
     "Responda APENAS com o codigo (sem markdown fences extras)."
 )
 
+_DEV_RETRY_SYSTEM = (
+    "Voce e o Dev Agent do AgentFlow Studio em modo de autocorrecao. "
+    "O codigo que voce gerou anteriormente falhou ao rodar no sandbox de "
+    "validacao. Esta e a tentativa {attempt_number} de no maximo 2.\n\n"
+    "ERRO REPORTADO PELO SANDBOX:\n{stderr}\n\n"
+    "CODIGO ANTERIOR:\n{previous_code}\n\n"
+    "REGRAS:\n"
+    "1. Diagnostique a causa raiz do erro antes de corrigir.\n"
+    "2. Corrija apenas o necessario; nao reescreva o que nao tem relacao "
+    "com o erro.\n"
+    "3. Se esta for a tentativa 2 e voce nao tiver certeza da causa raiz, "
+    "seja honesto e mantenha o que funciona.\n"
+    "4. Responda APENAS com o codigo corrigido (sem markdown fences extras)."
+)
+
 
 class DevAgent:
     def __init__(self, llm, sandbox) -> None:
@@ -29,14 +44,30 @@ class DevAgent:
 
     async def run(self, plan: str) -> DevOutput:
         last_error: str | None = None
+        previous_code: str = ""
         for attempt in range(1, self._max_attempts + 1):
             try:
-                code = await self._llm.generate_text(
-                    system_prompt=_DEV_SYSTEM, user_prompt=plan
-                )
+                if attempt == 1:
+                    # Primeira tentativa: gera a partir do plano.
+                    code = await self._llm.generate_text(
+                        system_prompt=_DEV_SYSTEM, user_prompt=plan
+                    )
+                else:
+                    # Tentativas seguintes: autocorrecao DIRECIONADA — inclui o
+                    # codigo anterior e o stderr do sandbox, pedindo a correcao
+                    # do erro (nao uma geracao do zero). Ref: Prompts v0.1 §6.5.
+                    system = _DEV_RETRY_SYSTEM.format(
+                        attempt_number=attempt,
+                        stderr=last_error or "erro desconhecido",
+                        previous_code=previous_code,
+                    )
+                    code = await self._llm.generate_text(
+                        system_prompt=system, user_prompt=plan
+                    )
             except Exception as exc:
                 return DevOutput(attempts=attempt, error_log=str(exc))
 
+            previous_code = code
             result = await self._sandbox.validate(code)
             if result.success:
                 return DevOutput(

@@ -14,6 +14,7 @@ from app.models.user_preference import UserPreference  # noqa: F401
 from app.models.budget import BudgetLimit  # noqa: F401
 from app.models.research_cache import ResearchCache  # noqa: F401
 from app.models.agent import Agent  # noqa: F401
+from app.models.conversation import Conversation, Message  # noqa: F401
 
 __all__ = [
     "Base",
@@ -27,4 +28,6 @@ __all__ = [
     "BudgetLimit",
     "ResearchCache",
     "Agent",
+    "Conversation",
+    "Message",
 ]

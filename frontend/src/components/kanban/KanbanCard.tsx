@@ -113,6 +113,14 @@ export function KanbanCard({ card, onOpen, onDragStart, onDragEnd }: Props) {
             {PHASE_LABEL[phase] ?? phase}
           </span>
         )}
+        {card.auto_approved && (
+          <span
+            className="inline-flex items-center gap-1 rounded-[20px] border border-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--accent-text)]"
+            title="Aprovado automaticamente pelo sistema (ADR-007)"
+          >
+            🤖 Auto-aprovado
+          </span>
+        )}
         {meta.agent && (
           <span className="inline-flex items-center gap-1.5 rounded-[20px] border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[10.5px] text-[var(--text-2)]">
             <span

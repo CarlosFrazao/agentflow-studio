@@ -8,6 +8,7 @@ from app.api.v1 import (
     auth,
     budget,
     cards,
+    conversations,
     dashboard,
     health,
     metrics,
@@ -37,6 +38,9 @@ router.include_router(
 )
 router.include_router(
     cards.router, dependencies=[Depends(get_current_user)]
+)
+router.include_router(
+    conversations.router, dependencies=[Depends(get_current_user)]
 )
 router.include_router(
     artifacts.router, dependencies=[Depends(get_current_user)]

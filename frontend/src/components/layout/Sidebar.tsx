@@ -12,6 +12,7 @@ import { useBoardStore, type BoardView } from "../../store/useBoardStore";
 
 const NAV_ITEMS: Array<{ view: BoardView; label: string }> = [
   { view: "kanban", label: "Kanban" },
+  { view: "conductor", label: "Conductor" },
   { view: "dashboard", label: "Dashboard" },
 ];
 

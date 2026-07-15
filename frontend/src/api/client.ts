@@ -54,7 +54,7 @@ async function apiFetchOnce(
 export async function apiGet<T>(path: string): Promise<T> {
   return (await apiFetch(path)) as T;
 }
-async function apiSend<T>(
+export async function apiSend<T>(
   method: string,
   path: string,
   payload?: unknown,

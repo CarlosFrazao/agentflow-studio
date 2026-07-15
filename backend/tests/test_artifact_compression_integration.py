@@ -2,7 +2,8 @@
 
 Cobre:
 - `should_compress_artifact` (helper puro budget-aware no orchestrator).
-- `_maybe_compress` / `_budget_remaining_usd` (helpers do run.py).
+- `maybe_compress` / `budget_remaining_usd` (helpers de pipeline_helpers,
+  reutilizados por run.py e pelo Conductor F-023).
 - Fluxo real: card em 'planning' consome o artifact 'research' comprimido antes
   de passar ao Planner. `compress_artifact` é sempre mockado (sem rede/LLM).
 """
@@ -49,7 +50,7 @@ def test_should_compress_none_budget_allows() -> None:
 
 @asyncio_test
 async def test_maybe_compress_calls_compressor_when_eligible(monkeypatch) -> None:
-    import app.api.v1.run as run_mod
+    from app.services import pipeline_helpers as ph_mod
 
     called = {}
 
@@ -57,35 +58,35 @@ async def test_maybe_compress_calls_compressor_when_eligible(monkeypatch) -> Non
         called["text_len"] = len(text)
         return "RESUMIDO"
 
-    monkeypatch.setattr(run_mod, "compress_artifact", _fake_compress)
-    out = await run_mod._maybe_compress("x" * 5000, budget_remaining_usd=5.0)
+    monkeypatch.setattr(ph_mod, "compress_artifact", _fake_compress)
+    out = await ph_mod.maybe_compress("x" * 5000, budget_remaining_usd=5.0)
     assert out == "RESUMIDO"
     assert called["text_len"] == 5000
 
 
 @asyncio_test
 async def test_maybe_compress_skips_when_budget_exhausted(monkeypatch) -> None:
-    import app.api.v1.run as run_mod
+    from app.services import pipeline_helpers as ph_mod
 
     async def _fail(text: str, budget_tokens: int = 800) -> str:
         raise AssertionError("não deveria comprimir sem orçamento")
 
-    monkeypatch.setattr(run_mod, "compress_artifact", _fail)
+    monkeypatch.setattr(ph_mod, "compress_artifact", _fail)
     big = "x" * 5000
-    out = await run_mod._maybe_compress(big, budget_remaining_usd=0.0)
+    out = await ph_mod.maybe_compress(big, budget_remaining_usd=0.0)
     assert out == big  # devolve original, sem chamar o compressor
 
 
 @asyncio_test
 async def test_maybe_compress_fail_open(monkeypatch) -> None:
-    import app.api.v1.run as run_mod
+    from app.services import pipeline_helpers as ph_mod
 
     async def _boom(text: str, budget_tokens: int = 800) -> str:
         raise RuntimeError("compressor quebrou")
 
-    monkeypatch.setattr(run_mod, "compress_artifact", _boom)
+    monkeypatch.setattr(ph_mod, "compress_artifact", _boom)
     big = "x" * 5000
-    out = await run_mod._maybe_compress(big, budget_remaining_usd=5.0)
+    out = await ph_mod.maybe_compress(big, budget_remaining_usd=5.0)
     assert out == big  # fail-open: retorna original em vez de derrubar o pipeline
 
 
@@ -105,7 +106,7 @@ async def _seed_card_in_planning(client) -> str:
 
 @asyncio_test
 async def test_planning_run_compresses_research_artifact(client, monkeypatch) -> None:
-    import app.api.v1.run as run_mod
+    from app.services import pipeline_helpers as ph_mod
     from app.services.agents.planner import PlannerAgent, PlannerOutput
 
     big_report = (
@@ -126,7 +127,7 @@ async def test_planning_run_compresses_research_artifact(client, monkeypatch) ->
         received["code_research"] = code_research
         return PlannerOutput(title="Plano", raw_plan="ok")
 
-    monkeypatch.setattr(run_mod, "compress_artifact", _fake_compress)
+    monkeypatch.setattr(ph_mod, "compress_artifact", _fake_compress)
     monkeypatch.setattr(PlannerAgent, "run", _fake_planner_run)
 
     cid = await _seed_card_in_planning(client)

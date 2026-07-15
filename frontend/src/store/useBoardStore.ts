@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Card, KanbanColumn } from "../types/card";
 
-export type BoardView = "kanban" | "dashboard";
+export type BoardView = "kanban" | "dashboard" | "conductor";
 
 export interface BoardFilters {
   phase: string; // "" = todas
