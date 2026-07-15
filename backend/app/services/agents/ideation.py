@@ -14,13 +14,29 @@ class IdeationOutput(BaseModel):
     key_features: list[str] = Field(default_factory=list)
     elevator_pitch: str = ""
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    problem_statement: str = ""
+    target_user: str = ""
+    out_of_scope: str = ""
+    open_questions: list[str] = Field(default_factory=list)
+
+    @property
+    def needs_clarification(self) -> bool:
+        """Sinal derivado (single source of truth): há perguntas em aberto?
+
+        NÃO vem do LLM — é sempre computado a partir de `open_questions`, para
+        evitar que o modelo declare o card como "claro" tendo perguntas pendentes.
+        """
+        return bool(self.open_questions)
 
 
 _IDEATION_SYSTEM = (
     "Voce e o Ideation Agent do AgentFlow Studio. Transforme a ideia bruta "
     "do usuario em um JSON estruturado. Responda APENAS em JSON com o schema: "
     '{"project_name": str, "key_features": [str], "elevator_pitch": str, '
-    '"confidence_score": float entre 0 e 1}.'
+    '"confidence_score": float entre 0 e 1, "problem_statement": str, '
+    '"target_user": str, "out_of_scope": str, "open_questions": [str]}. '
+    "Se a ideia for vaga ou contraditoria, popule `open_questions` com perguntas "
+    "especificas em vez de inventar detalhes."
 )
 
 
@@ -37,4 +53,8 @@ class IdeationAgent:
             key_features=data.get("key_features", []),
             elevator_pitch=data.get("elevator_pitch", ""),
             confidence_score=float(data.get("confidence_score", 0.0)),
+            problem_statement=data.get("problem_statement", ""),
+            target_user=data.get("target_user", ""),
+            out_of_scope=data.get("out_of_scope", ""),
+            open_questions=data.get("open_questions") or [],
         )

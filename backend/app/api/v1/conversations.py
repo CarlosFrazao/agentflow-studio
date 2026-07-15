@@ -124,6 +124,7 @@ async def post_message(
         ],
         card_id=result["card_id"],
         awaiting_user=result["awaiting_user"],
+        awaiting_confirmation=result.get("awaiting_confirmation", False),
     )
     return success_envelope(
         data=response.model_dump(mode="json"), request_id=request_id

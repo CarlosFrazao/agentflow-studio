@@ -48,6 +48,7 @@ class ConductorTurnResponse(BaseModel):
     tool_calls: list[ConductorToolCall] = Field(default_factory=list)
     card_id: UUID | None = None
     awaiting_user: bool = False
+    awaiting_confirmation: bool = False
 
 
 # --- Plano emitido pelo LLM (parsing manual de function calling) ---

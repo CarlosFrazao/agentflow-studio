@@ -126,12 +126,20 @@ async def test_run_ideation_creates_card_and_binds_conversation(
     body = await _turn(client, cid, "quero criar um app de caronas pra faculdade")
     assert body["card_id"] is not None
     assert body["awaiting_user"] is False
+    # FEAT-005: a ideation pausa em backlog (não avança automaticamente).
+    assert body["awaiting_confirmation"] is True
 
-    # O Card foi criado e avançou para researching (Ideation concluído).
+    # O Card foi criado e permanece em backlog aguardando confirmação.
+    card = await client.get("/api/v1/cards/" + body["card_id"])
+    assert card.json()["data"]["column"] == "backlog"
+
+    # Confirma -> avança para researching (Ideation concluído).
+    confirm = await _turn(client, cid, "confirmar e prosseguir")
+    assert confirm["awaiting_confirmation"] is False
     card = await client.get("/api/v1/cards/" + body["card_id"])
     assert card.json()["data"]["column"] == "researching"
 
-    # Conversation.card_id foi preenchido.
+    # Conversation.card_id foi preenchido (já na ideation, antes da confirmação).
     async with session_factory() as s:
         conv = await s.get(Conversation, UUID(cid))
         assert conv.card_id == UUID(body["card_id"])
@@ -171,8 +179,10 @@ async def test_research_and_code_research_run_in_parallel(
     _override_services(client, _FakeLLM())
     pid = await _seed_project(client)
     cid = await _create_conversation(client, pid)
-    # T1: cria o card (ideation) -> researching.
+    # T1: cria o card (ideation) -> pausa em backlog.
     await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    # Confirma a ideation -> researching.
+    await _turn(client, cid, "confirmar e prosseguir")
     # T2: pesquisa (research + code_research em paralelo).
     body = await _turn(client, cid, "seguir com a pesquisa")
 
@@ -233,6 +243,7 @@ async def test_reviewer_critical_makes_conductor_ask_user(
     pid = await _seed_project(client)
     cid = await _create_conversation(client, pid)
     await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    await _turn(client, cid, "confirmar e prosseguir")
     await _turn(client, cid, "seguir com a pesquisa")
     await _turn(client, cid, "fazer o plano")
     body = await _turn(client, cid, "revisar")
@@ -297,6 +308,7 @@ async def test_auto_approve_threshold_reused_from_orchestrator(
     pid = await _seed_project(client)
     cid = await _create_conversation(client, pid)
     await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    await _turn(client, cid, "confirmar e prosseguir")
     await _turn(client, cid, "seguir com a pesquisa")
     await _turn(client, cid, "fazer o plano")
     body = await _turn(client, cid, "revisar")
@@ -354,7 +366,8 @@ async def test_card_columns_match_run_pipeline(
 
     # Cada mensagem avança o card exatamente como o /run faria.
     seq = [
-        ("quero criar um app de caronas", "researching"),
+        ("quero criar um app de caronas", "backlog"),  # ideation pausa (FEAT-005)
+        ("confirmar e prosseguir", "researching"),     # confirma -> researching
         ("pesquisar", "planning"),
         ("planejar", "reviewing"),
         ("revisar", "production"),  # reviewer reprovou -> production
@@ -423,6 +436,7 @@ async def test_full_pipeline_via_chat_zero_to_code(
     cid = await _create_conversation(client, pid)
 
     await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    await _turn(client, cid, "confirmar e prosseguir")
     await _turn(client, cid, "seguir com a pesquisa")
     await _turn(client, cid, "fazer o plano")
     await _turn(client, cid, "revisar")
@@ -496,6 +510,392 @@ async def test_conductor_publishes_card_updated_event(
     updated = [e for e in published if e.type == "card.updated"]
     assert updated, "Conductor deve publicar card.updated no EventBus"
     payload = updated[-1].payload
-    assert payload["column"] == "researching"
+    # FEAT-005: a ideation pausa em backlog (não avança para researching).
+    assert payload["column"] == "backlog"
     assert payload["project_id"] == pid
     assert payload["card_id"]
+
+    # A confirmação avança o card para researching e publica o evento.
+    await _turn(client, cid, "confirmar e prosseguir")
+    researching_events = [
+        e for e in published if e.type == "card.updated" and e.payload["column"] == "researching"
+    ]
+    assert researching_events, "confirmação deve publicar card.updated em researching"
+
+
+# ---------------------------------------------------------------------------
+# FEAT-003: Injeção do histórico da conversa no prompt do _plan()
+# ---------------------------------------------------------------------------
+
+class _SpyLLM:
+    """Captura o user_prompt recebido pelo _plan (para inspecionar o histórico)."""
+
+    def __init__(self) -> None:
+        self.last_user_prompt: str | None = None
+
+    async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        self.last_user_prompt = user_prompt
+        return {"narrative": "", "tool_calls": []}
+
+    async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+        return ""
+
+
+async def _make_conductor(session, project_id, spy):
+    from app.models.conversation import Conversation
+    from app.services.conductor import Conductor
+
+    conv = Conversation(project_id=project_id)
+    session.add(conv)
+    await session.commit()
+    await session.refresh(conv)
+    cond = Conductor(
+        conv, session, llm=spy, sra=_DummySRA(), firecrawl=_DummyFirecrawl(),
+        github=_DummyGithub(), sandbox=_OkSandbox(),
+    )
+    return cond, conv
+
+
+async def test_plan_includes_recent_history(session_factory) -> None:
+    from app.models.project import Project
+    from app.models.conversation import Message
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+
+        spy = _SpyLLM()
+        cond, conv = await _make_conductor(s, proj.id, spy)
+        # Pré-popula a conversa com mensagens anteriores.
+        s.add(Message(conversation_id=conv.id, role="user", content="mensagem antiga do user"))
+        s.add(Message(conversation_id=conv.id, role="conductor", content="resposta anterior"))
+        await s.commit()
+
+        await cond._plan("e aí, continua", column="researching")
+        assert spy.last_user_prompt is not None
+        assert "mensagem antiga do user" in spy.last_user_prompt
+
+
+async def test_plan_empty_history_graceful(session_factory) -> None:
+    from app.models.project import Project
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+
+        spy = _SpyLLM()
+        cond, conv = await _make_conductor(s, proj.id, spy)
+        assert cond._format_history([]) == ""
+        # _plan não quebra com histórico vazio.
+        await cond._plan("primeira mensagem", column=None)
+        assert spy.last_user_prompt is not None
+
+
+async def test_recent_messages_limit(session_factory) -> None:
+    from app.models.project import Project
+    from app.models.conversation import Message
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+
+        spy = _SpyLLM()
+        cond, conv = await _make_conductor(s, proj.id, spy)
+        # created_at explícito e crescente: garante ordem determinística
+        # (created_at do SQLite tem resolução de segundos e o id é uuid4).
+        from datetime import datetime, timedelta, timezone
+
+        base = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+        for i in range(15):
+            s.add(
+                Message(
+                    conversation_id=conv.id,
+                    role="user",
+                    content=f"msg-{i:02d}",
+                    created_at=base + timedelta(seconds=i),
+                )
+            )
+            await s.commit()
+
+        recent = await cond._recent_messages()
+        assert len(recent) == 10
+        contents = [m.content for m in recent]
+        # Ordem cronológica (mais antiga primeiro entre as 10 mais recentes).
+        assert contents == [f"msg-{i:02d}" for i in range(5, 15)]
+
+
+# ---------------------------------------------------------------------------
+# FEAT-005: Pausa de confirmação pós-ideation (C4 / F-022)
+# ---------------------------------------------------------------------------
+
+async def test_ideation_pauses_for_confirmation(
+    client, session_factory, monkeypatch
+) -> None:
+    """Ideia clara: card NÃO avança — fica em backlog aguardando confirmação."""
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+
+    async def fake_run(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="CaronasFaculdade",
+            key_features=["match"],
+            elevator_pitch="p",
+            confidence_score=0.9,
+        )
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_run)
+
+    _override_services(client, _FakeLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+
+    body = await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    # Após a ideation, o card NÃO avança (FEAT-005): permanece em backlog.
+    assert body["card_id"] is not None
+    assert body["awaiting_confirmation"] is True
+    assert body["awaiting_user"] is False
+
+    card = await client.get("/api/v1/cards/" + body["card_id"])
+    assert card.json()["data"]["column"] == "backlog"
+
+
+async def test_ideation_pause_exposes_open_questions_when_ambiguous(
+    client, session_factory, monkeypatch
+) -> None:
+    """Ideia vaga (FEAT-001): pausa expõe open_questions no output."""
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+
+    async def fake_run(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="",
+            key_features=[],
+            elevator_pitch="",
+            confidence_score=0.1,
+            open_questions=["qual o publico alvo?", "qual o orcamento?"],
+        )
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_run)
+
+    _override_services(client, _FakeLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+
+    body = await _turn(client, cid, "quero criar um app")
+    assert body["awaiting_confirmation"] is True
+    # FEAT-001: perguntas abertas expostas quando a ideia é vaga.
+    assert body["tool_calls"][0]["output"]["open_questions"]
+    # FEAT-005: mesmo com ambiguidade, o card pausa em backlog (não avança).
+    card = await client.get("/api/v1/cards/" + body["card_id"])
+    assert card.json()["data"]["column"] == "backlog"
+
+
+async def test_confirm_ideation_advances_to_researching(
+    client, session_factory, monkeypatch
+) -> None:
+    """Fallback determinístico em backlog (card existente) confirma -> researching."""
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+
+    async def fake_run(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="CaronasFaculdade",
+            key_features=["match"],
+            elevator_pitch="p",
+            confidence_score=0.9,
+        )
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_run)
+
+    _override_services(client, _FakeLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+
+    # T1: ideation cria o card e PAUSA em backlog.
+    body = await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    card_id = body["card_id"]
+    assert body["awaiting_confirmation"] is True
+    card = await client.get("/api/v1/cards/" + card_id)
+    assert card.json()["data"]["column"] == "backlog"
+
+    # T2: confirma -> avança para researching (não recria card).
+    body = await _turn(client, cid, "confirmar e prosseguir")
+    assert body["awaiting_confirmation"] is False
+    card = await client.get("/api/v1/cards/" + card_id)
+    assert card.json()["data"]["column"] == "researching"
+
+
+async def test_confirm_ideation_does_not_create_duplicate_card(
+    client, session_factory, monkeypatch
+) -> None:
+    """Confirmar em backlog NÃO cria um segundo card (fallback ciente da pausa)."""
+    from app.models.card import Card
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+
+    async def fake_run(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="CaronasFaculdade",
+            key_features=["match"],
+            elevator_pitch="p",
+            confidence_score=0.9,
+        )
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_run)
+
+    _override_services(client, _FakeLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+
+    await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    await _turn(client, cid, "confirmar e prosseguir")
+
+    async with session_factory() as s:
+        from sqlalchemy import select, func
+
+        total = (
+            await s.execute(select(func.count()).select_from(Card))
+        ).scalar()
+        assert total == 1, "confirm em backlog não deve duplicar card"
+
+
+async def test_confirm_ideation_with_correction_reruns_ideation(
+    session_factory, monkeypatch
+) -> None:
+    """confirm_ideation com correções re-executa a Ideation antes de avançar."""
+    from sqlalchemy import select
+
+    from app.models import Artifact
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+    from app.services.conductor import Conductor, TOOL_CONFIRM_IDEATION
+
+    async def fake_run(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="CaronasCorrigida",
+            key_features=["match"],
+            elevator_pitch="p",
+            confidence_score=0.9,
+        )
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_run)
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="backlog", title="Ideia original")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+        spy = _SpyLLM()
+        cond, conv = await _make_conductor(s, proj.id, spy)
+        cond._conversation.card_id = card.id
+        await s.commit()
+
+        result = await cond._run_tool(
+            TOOL_CONFIRM_IDEATION, card, {"corrections": "foco em estudantes"}
+        )
+        assert result["card"].column == "researching"
+        assert result["output"]["confirmed"] is True
+        # Ideation foi re-executada: novo artifact com project_name corrigido.
+        art = (
+            await s.execute(
+                select(Artifact).where(
+                    Artifact.card_id == card.id, Artifact.agent_name == "ideation"
+                )
+            )
+        ).scalars().first()
+        assert art is not None
+        assert "CaronasCorrigida" in art.content
+
+
+# ---------------------------------------------------------------------------
+# FEAT-004: Modo resposta livre `answer_question` (C2)
+# ---------------------------------------------------------------------------
+
+async def test_freeform_question_returns_narrative_only(
+    client, session_factory, monkeypatch
+) -> None:
+    """Pergunta aberta em `planning`: responde narrativamente, NÃO roda o planner.
+
+    O Conductor deve tratar a mensagem como discussão (sem intenção de avançar o
+    pipeline) e usar `answer_question` — persistindo apenas a narrative, sem
+    executar o próximo agente e sem mover o card de coluna.
+    """
+    from app.services.agents.ideation import IdeationAgent, IdeationOutput
+    from app.services.agents.research import ResearchAgent, ResearchOutput
+    from app.services.agents.code_research import (
+        CodeResearchAgent,
+        CodeResearchOutput,
+    )
+    from app.services.agents.planner import PlannerAgent, PlannerOutput
+
+    async def fake_ideation(self, raw_idea):  # noqa: ANN001
+        return IdeationOutput(
+            project_name="App", key_features=["x"], elevator_pitch="p", confidence_score=0.9
+        )
+
+    async def fake_research(self, query, mode="guerrilha"):  # noqa: ANN001
+        return ResearchOutput(sra_report="# r", confidence=0.9)
+
+    async def fake_code_research(self, **kwargs):  # noqa: ANN001
+        return CodeResearchOutput(suggestions=["a"], license_class="permissive")
+
+    planner_ran = {"value": False}
+
+    async def fake_planner(self, ideation, research, code_research):  # noqa: ANN001
+        planner_ran["value"] = True
+        return PlannerOutput(title="t", stack=["py"], milestones=[], risks=[])
+
+    monkeypatch.setattr(IdeationAgent, "run", fake_ideation)
+    monkeypatch.setattr(ResearchAgent, "run", fake_research)
+    monkeypatch.setattr(CodeResearchAgent, "run", fake_code_research)
+    monkeypatch.setattr(PlannerAgent, "run", fake_planner)
+
+    class _AnswerLLM:
+        """LLM que avança o pipeline pelos turnos normais (fallback por coluna)
+        e, apenas na pergunta aberta, decide responder em vez de avançar."""
+
+        async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+            if "Postgres" in user_prompt:
+                return {
+                    "narrative": (
+                        "Escolhi Postgres pela consistencia transacional e "
+                        "suporte a JSONB."
+                    ),
+                    "tool_calls": [{"tool": "answer_question", "input": {}}],
+                }
+            # Turnos normais: tool_calls vazio -> fallback determinístico por coluna.
+            return {"narrative": "", "tool_calls": []}
+
+        async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+            return "narrativa"
+
+    _override_services(client, _AnswerLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+
+    # Avança até `planning` (ideation -> confirm -> research; planner ainda não rodou).
+    await _turn(client, cid, "quero criar um app")
+    await _turn(client, cid, "confirmar e prosseguir")
+    to_planning = await _turn(client, cid, "pesquisar")
+    card = await client.get("/api/v1/cards/" + to_planning["card_id"])
+    assert card.json()["data"]["column"] == "planning"
+
+    # Pergunta aberta — sem intenção de avançar o pipeline.
+    resp = await _turn(client, cid, "por que escolheu Postgres?")
+
+    # tool_calls está vazio OU contém apenas `answer_question`.
+    tools = [tc["tool"] for tc in resp["tool_calls"]]
+    assert all(t == "answer_question" for t in tools), tools
+    # O Planner NÃO roda (apenas narrative é produzida).
+    assert planner_ran["value"] is False
+    # Não aguarda o usuário; o card não avança de coluna.
+    assert resp["awaiting_user"] is False
+    card = await client.get("/api/v1/cards/" + to_planning["card_id"])
+    assert card.json()["data"]["column"] == "planning"

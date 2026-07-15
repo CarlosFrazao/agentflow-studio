@@ -27,8 +27,13 @@ async def create_card(
     if not project:
         raise ValidationError("project_id invalido ou inexistente")
     # Item C: hidrata o título do usuário (PT informal -> EN técnico + regras).
+    # llm=None mantém o caminho síncrono determinístico (zero I/O) neste
+    # endpoint async — o LLMTranslator (asyncio.run) não pode rodar sob o loop
+    # ativo do FastAPI; a tradução fluida via LLM fica para chamadores síncronos.
     meta = dict(body.meta or {})
-    hydrated = hydrate_prompt(body.title, project_context={"name": project.name})
+    hydrated = hydrate_prompt(
+        body.title, project_context={"name": project.name}, llm=None
+    )
     if hydrated:
         meta["hydrated_prompt"] = hydrated
     card = Card(

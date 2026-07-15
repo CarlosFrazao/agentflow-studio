@@ -22,6 +22,7 @@ from uuid import UUID
 
 import time
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -56,11 +57,15 @@ TOOL_REVIEWER = "run_reviewer"
 TOOL_DEV = "run_dev"
 TOOL_GET_CARD_STATE = "get_card_state"
 TOOL_ASK_USER = "ask_user"
+TOOL_CONFIRM_IDEATION = "confirm_ideation"
+TOOL_ANSWER = "answer_question"
 
 # Mapeia a coluna atual do card para o conjunto determinístico de ferramentas.
 # Ideation cria o card, então a etapa inicial (sem card) força run_ideation.
+# Em "backlog" com card já criado, o Conductor pausa e oferece confirm_ideation
+# (FEAT-005): o card NÃO avança automaticamente após a ideation.
 COLUMN_TO_TOOLS: dict[str, list[str]] = {
-    "backlog": [TOOL_IDEATION],
+    "backlog": [TOOL_IDEATION, TOOL_CONFIRM_IDEATION],
     "researching": [TOOL_RESEARCH, TOOL_CODE_RESEARCH],
     "planning": [TOOL_PLANNER],
     "reviewing": [TOOL_REVIEWER],
@@ -79,14 +84,28 @@ _SYSTEM_PROMPT = (
     '(4) na coluna "reviewing" rode "run_reviewer"; (5) se o Reviewer emitir '
     'alerta crítico, PARE e use "ask_user" (não decida sozinho); (6) na coluna '
     '"production" rode "run_dev"; (7) use "get_card_state" para consultar o '
-    "card. Nunca invente ferramentas fora desta lista."
+    'card; (8) quando a ideation já rodou e o card está em "backlog" aguardando '
+    'sua confirmação, use "confirm_ideation" para avançar para "researching" '
+    '(se o usuário enviar correções, elas são aplicadas antes de avançar). (9) '
+    "quando o usuário fizer uma pergunta ou discussão sobre o que já foi feito "
+    "(sem intenção de avançar o pipeline), use \"answer_question\" com "
+    '"tool_calls":[] e apenas "narrative" — NÃO rode o próximo agente nem avance '
+    'o card. Nunca invente ferramentas fora desta lista.'
 )
 
 
-def _default_plan_for_column(column: str | None) -> list[str]:
-    """Plano determinístico de fail-open pela coluna atual do card."""
+def _default_plan_for_column(column: str | None, has_card: bool = False) -> list[str]:
+    """Plano determinístico de fail-open pela coluna atual do card.
+
+    Em "backlog" a ideation cria o card, mas por design (FEAT-005) a ideation
+    NÃO avança o card — ela pausa. Quando já existe um card em backlog (a
+    ideation já rodou e pausou), o fail-open confirma/avança para researching
+    em vez de recriar um card (evita loop de cards duplicados).
+    """
     if column is None:
         return [TOOL_IDEATION]
+    if column == "backlog" and has_card:
+        return [TOOL_CONFIRM_IDEATION]
     return COLUMN_TO_TOOLS.get(column, [TOOL_GET_CARD_STATE])
 
 
@@ -139,12 +158,18 @@ class Conductor:
         # 1) Plano: LLM (JSON manual) com fallback determinístico por coluna.
         plan = await self._plan(user_message, column)
         tool_names = [tc.tool for tc in plan.tool_calls] or _default_plan_for_column(
-            column
+            column, has_card=card is not None
         )
+        # FEAT-004: resposta livre — se o LLM sinalizou answer_question, ele foi o
+        # único tool indicado (tool_calls vazio ou [answer_question]). Nesse ramo o
+        # Conductor apenas responde narrativamente, sem rodar agente nem avançar o card.
+        if plan.tool_calls and all(tc.tool == TOOL_ANSWER for tc in plan.tool_calls):
+            tool_names = [TOOL_ANSWER]
 
         # 2) Executa as tools indicadas.
         executed: list[dict[str, Any]] = []
         awaiting_user = False
+        awaiting_confirmation = False
         # Research + Code Research rodam EM PARALELO (asyncio.gather) — prova de
         # paralelismo real: seus started_at ficam sobrepostos (Plano F-023 §3.2).
         parallel_names = [TOOL_RESEARCH, TOOL_CODE_RESEARCH]
@@ -166,11 +191,13 @@ class Conductor:
                 if result.get("critical_alert"):
                     awaiting_user = True
 
+        tool_input_by_name = {tc.tool: tc.input for tc in plan.tool_calls}
+
         for name in sequential:
             if name == TOOL_ASK_USER:
                 awaiting_user = True
                 continue
-            result = await self._run_tool(name, card)
+            result = await self._run_tool(name, card, tool_input_by_name.get(name, {}))
             executed.append(result)
             card = result.get("card") or card
             # Transparência: cada tool vira uma Message(role=tool).
@@ -184,6 +211,10 @@ class Conductor:
             # Se um Reviewer crítico for detectado, o Conductor para e pergunta.
             if result.get("critical_alert"):
                 awaiting_user = True
+            # FEAT-005: pausa pós-ideation — o card aguarda confirmação do usuário.
+            # Inclui o branch de clarificação (FEAT-001): ideia vaga também pausa.
+            if result.get("awaiting_confirmation") or result.get("awaiting_clarification"):
+                awaiting_confirmation = True
 
         # 3) Narrativa: usa a do plano (LLM) ou gera a partir dos resultados.
         narrative = plan.narrative
@@ -199,6 +230,7 @@ class Conductor:
             "tool_calls": executed,
             "card_id": self._conversation.card_id,
             "awaiting_user": awaiting_user,
+            "awaiting_confirmation": awaiting_confirmation,
         }
 
     def _tool_summary(self, result: dict[str, Any]) -> str:
@@ -255,7 +287,10 @@ class Conductor:
             if column is not None
             else "ainda não há card (ideia nova)"
         )
-        user_prompt = f"{state}\nmensagem do usuario: {user_message}"
+        # FEAT-003: injeta o histórico recente da conversa (fail-open: vazio =
+        # não quebra o prompt, apenas não adiciona contexto).
+        history = self._format_history(await self._recent_messages())
+        user_prompt = f"{state}\n{history}\nmensagem do usuario: {user_message}"
         try:
             data = await self._llm.generate_json(
                 system_prompt=_SYSTEM_PROMPT, user_prompt=user_prompt
@@ -266,7 +301,10 @@ class Conductor:
         except Exception as exc:  # noqa: BLE001
             logger.warning("conductor_plan_llm_failed", error=str(exc))
         # Fail-open: plano determinístico pela coluna.
-        tools = _default_plan_for_column(column)
+        # column is not None => já existe um card (a coluna vem do card); nas
+        # colunas válidas, um card em backlog com ideation já rodada deve
+        # confirmar/avançar (FEAT-005) em vez de recriar o card.
+        tools = _default_plan_for_column(column, has_card=column is not None)
         return _StubPlan(tools)
 
     def _validate_plan(self, data: dict, column: str | None) -> Any | None:
@@ -275,7 +313,7 @@ class Conductor:
             plan = _ConductorPlanShim(**data)
         except Exception:  # noqa: BLE001
             return None
-        calls = [c for c in plan.tool_calls if c.tool in COLUMN_TO_TOOLS.get(column or "", []) or c.tool in (TOOL_ASK_USER, TOOL_GET_CARD_STATE)]
+        calls = [c for c in plan.tool_calls if c.tool in COLUMN_TO_TOOLS.get(column or "", []) or c.tool in (TOOL_ASK_USER, TOOL_GET_CARD_STATE, TOOL_CONFIRM_IDEATION, TOOL_ANSWER)]
         # Se o card ainda não existe, só run_ideation é aceitável como primeira ação.
         if column is None and calls and calls[0].tool != TOOL_IDEATION:
             return None
@@ -284,10 +322,56 @@ class Conductor:
         return plan
 
     # ------------------------------------------------------------------
+    # Histórico da conversa (FEAT-003 — memória de curto prazo no prompt)
+    # ------------------------------------------------------------------
+
+    async def _recent_messages(self, limit: int = 10) -> list[Message]:
+        """Retorna as `limit` mensagens mais recentes em ordem cronológica.
+
+        Ordena por `created_at DESC, id DESC` (o id é uuid4, não ordenável no
+        tempo — por isso `created_at` é a chave primária de ordenação, com o id
+        só como desempate estável). O resultado é revertido para ordem
+        cronológica (mais antiga primeiro).
+        """
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == self._conversation.id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(limit)
+        )
+        rows = (await self._session.scalars(stmt)).all()
+        return list(reversed(rows))
+
+    def _format_history(self, msgs: list[Message]) -> str:
+        """Formata as mensagens como `{role}: {content}`.
+
+        Mensagens de tool incluem o nome da tool e um resumo do output. Lista
+        vazia retorna string vazia (fail-open).
+        """
+        if not msgs:
+            return ""
+        lines: list[str] = []
+        for m in msgs:
+            if m.role == "tool":
+                summary = ""
+                if isinstance(m.tool_output, dict):
+                    summary = ", ".join(
+                        f"{k}={v}" for k, v in list(m.tool_output.items())[:3]
+                    )
+                label = m.tool_name or "tool"
+                content = m.content or summary
+                lines.append(f"tool[{label}]: {content}".rstrip(": ").rstrip())
+            else:
+                lines.append(f"{m.role}: {m.content}")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
     # Execução de ferramentas (wrappers finos sobre agents reais)
     # ------------------------------------------------------------------
 
-    async def _run_tool(self, name: str, card: Card | None) -> dict[str, Any]:
+    async def _run_tool(
+        self, name: str, card: Card | None, user_input: dict | None = None
+    ) -> dict[str, Any]:
         self._tool_started_at[name] = self._now()
         if name == TOOL_IDEATION:
             return await self._tool_ideation()
@@ -303,6 +387,10 @@ class Conductor:
             return await self._tool_dev(card)
         if name == TOOL_GET_CARD_STATE:
             return await self._tool_card_state(card)
+        if name == TOOL_CONFIRM_IDEATION:
+            return await self._tool_confirm_ideation(card, user_input or {})
+        if name == TOOL_ANSWER:
+            return self._tool_answer_question(card)
         return {"tool": name, "input": {}, "output": {}, "card": card}
 
     async def _run_parallel(
@@ -347,9 +435,33 @@ class Conductor:
         await self._persist_artifact(
             card, "ideation", out.model_dump_json(), confidence=out.confidence_score
         )
-        # Avança o card uma coluna (Ideation concluído -> researching).
-        card.column = next_column(card.column)
         card.confidence_score = out.confidence_score
+
+        if out.needs_clarification:
+            # Ideia vaga/contraditória: NÃO avança para researching. O card
+            # permanece em backlog e expõe as open_questions ao usuário (FEAT-001).
+            await self._session.commit()
+            await self._session.refresh(card)
+            self._conversation.card_id = card.id
+            await self._session.commit()
+            self._publish_card_updated(card)
+            return {
+                "tool": TOOL_IDEATION,
+                "input": {"title": card.title},
+                "output": {
+                    "project_name": out.project_name,
+                    "key_features": out.key_features,
+                    "elevator_pitch": out.elevator_pitch,
+                    "confidence_score": out.confidence_score,
+                    "open_questions": out.open_questions,
+                },
+                "card": card,
+                "awaiting_clarification": True,
+            }
+
+        # Ideia clara: FEAT-005 — NÃO avança o card. A ideation pausa em backlog
+        # e aguarda confirmação do usuário (confirm_ideation) antes de prosseguir
+        # para researching (permite correções antes do pipeline caro rodar).
         await self._session.commit()
         await self._session.refresh(card)
 
@@ -366,7 +478,46 @@ class Conductor:
                 "key_features": out.key_features,
                 "elevator_pitch": out.elevator_pitch,
                 "confidence_score": out.confidence_score,
+                "open_questions": out.open_questions,
             },
+            "card": card,
+            "awaiting_confirmation": True,
+        }
+
+    async def _tool_confirm_ideation(
+        self, card: Card | None, user_input: dict
+    ) -> dict[str, Any]:
+        """Confirma a ideation pausada e avança o card para researching (FEAT-005).
+
+        Se o usuário enviou correções (user_input["corrections"]), a Ideation é
+        re-executada com o título ajustado antes de avançar o card.
+        """
+        if card is None:
+            return self._no_card(TOOL_CONFIRM_IDEATION)
+
+        corrections = (user_input or {}).get("corrections")
+        if corrections:
+            from app.services.agents.ideation import IdeationAgent
+
+            # Re-roda a Ideation com o contexto corrigido do usuário.
+            refined_title = f"{card.title} — {corrections}"
+            out = await IdeationAgent(llm=self._llm).run(refined_title)
+            await self._persist_artifact(
+                card, "ideation", out.model_dump_json(), confidence=out.confidence_score
+            )
+            card.confidence_score = out.confidence_score
+            card.title = refined_title
+
+        # Avança o card (backlog -> researching) após a confirmação do usuário.
+        card.column = next_column(card.column)
+        await self._session.commit()
+        await self._session.refresh(card)
+        self._publish_card_updated(card)
+
+        return {
+            "tool": TOOL_CONFIRM_IDEATION,
+            "input": user_input or {},
+            "output": {"confirmed": True},
             "card": card,
         }
 
@@ -568,6 +719,19 @@ class Conductor:
                 "confidence_score": card.confidence_score,
                 "auto_approved": card.auto_approved,
             },
+            "card": card,
+        }
+
+    def _tool_answer_question(self, card: Card | None) -> dict[str, Any]:
+        """Responde narrativamente a uma pergunta/discussão (FEAT-004, C2).
+
+        Não executa nenhum agente e NÃO avança o card — apenas persiste a
+        narrative (feita em handle_turn) e devolve o card sem alteração de coluna.
+        """
+        return {
+            "tool": TOOL_ANSWER,
+            "input": {},
+            "output": {"answered": True},
             "card": card,
         }
 
