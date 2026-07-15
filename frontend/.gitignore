@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local env / secrets
+.env
+.env.e2e
+.env.*
+
+# Playwright E2E artifacts
+.auth/
+playwright-report/
+test-results/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# E2E isolated database
+data/agentflow_e2e.db

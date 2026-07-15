@@ -1,0 +1,63 @@
+# Ignore node_modules for both backend and frontend
+backend/node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Test / coverage artifacts
+backend/.coverage
+.pytest_cache/
+htmlcov/
+
+# Runtime data (SQLite database is created on startup)
+data/
+backend/*.db
+*.sqlite
+*.sqlite3
+
+# Backups / scratch
+frontend_static.bak/
+*.bak
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Agent/runtime scratch (not part of the repo)
+.antigravity/
+Ambiente Testes/
+
+# Claude Code CLI — NUNCA commitar (contém API keys reais)
+.claude/settings.json
+.claude/settings.local.json
+
+# Claude Code Skills — ferramentas pessoais do desenvolvedor, não do projeto
+.claude/skills/
+
+# Memória interna do agente — não é código do projeto
+Conversa/
+
+# Arquivos temporários gerados pelo Claude durante depuração
+frontend/tmp_*.mjs
+frontend/tmp_*.cjs
+frontend/diag_*.png
+frontend/flow_*.png
+frontend/*.mjs
+
+# Arquivos de diagnóstico gerados automaticamente
+Ambiente\ Testes/logs/
+Ambiente\ Testes/screenshots/
+
+# External read-only reference material (not part of the repo)
+Hermes/
+
+# Arquivo de teste manual com credenciais de desenvolvimento
+backend/tests/test_llm_live.py

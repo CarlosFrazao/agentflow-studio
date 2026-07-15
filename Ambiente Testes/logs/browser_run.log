@@ -1,0 +1,585 @@
+[2026-07-14T17:33:51.394Z] ============================================================
+[2026-07-14T17:33:51.396Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T17:33:52.865Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T17:33:53.128Z] [WARN]  [Aviso] EMAIL_SELECTOR não configurado. Assumindo acesso direto sem autenticação.
+[2026-07-14T17:33:53.129Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T17:33:53.129Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T17:33:53.130Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T17:33:53.130Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T17:33:53.793Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T17-33-53.png
+[2026-07-14T17:36:26.617Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/auth/login → 401
+[2026-07-14T17:36:26.617Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:38:11.129Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/auth/login → 401
+[2026-07-14T17:38:11.129Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:47:09.213Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/auth/login → 401
+[2026-07-14T17:47:09.214Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:51:42.762Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T17:51:42.763Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:51:42.764Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T17:51:42.764Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:53:16.157Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T17:53:16.157Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:53:16.164Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T17:53:16.165Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:53:37.721Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T17:53:37.721Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T17:53:37.729Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T17:53:37.730Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:06:57.433Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:06:57.433Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:06:57.434Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:06:57.434Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:06:57.670Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:06:57.670Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:25.574Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:10:25.574Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:25.578Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:10:25.579Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:25.580Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:10:25.580Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:36.403Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:10:36.403Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:36.413Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:10:36.413Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:46.753Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:10:46.754Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:10:46.761Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:10:46.761Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:19:30.082Z] ============================================================
+[2026-07-14T18:19:30.084Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T18:19:30.466Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T18:19:30.651Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-14T18:19:30.713Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-14T18:19:32.437Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-14T18:19:32.563Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-14T18:19:32.566Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T18:19:32.566Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T18:19:32.566Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T18:19:32.567Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T18:19:32.639Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T18-19-32.png
+[2026-07-14T18:19:32.861Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/projects?per_page=100 → 401
+[2026-07-14T18:19:32.862Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:19:32.865Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:19:32.866Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:34:45.290Z] [ERROR] [HTTP Error] http://localhost:8000/api/v1/dashboard → 401
+[2026-07-14T18:34:45.290Z] [ERROR] [Console Error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-07-14T18:47:56.947Z] ============================================================
+[2026-07-14T18:47:56.948Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T18:47:57.429Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T18:47:57.619Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-14T18:47:57.672Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-14T18:47:59.393Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-14T18:47:59.528Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-14T18:47:59.531Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T18:47:59.533Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T18:47:59.534Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T18:47:59.534Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T18:47:59.607Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T18-47-59.png
+[2026-07-14T19:06:18.711Z] ============================================================
+[2026-07-14T19:06:18.712Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T19:06:19.201Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T19:06:19.393Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-14T19:06:19.439Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-14T19:06:21.161Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-14T19:06:21.285Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-14T19:06:21.287Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T19:06:21.287Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T19:06:21.288Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T19:06:21.288Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T19:06:21.366Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T19-06-21.png
+[2026-07-14T19:56:04.332Z] ============================================================
+[2026-07-14T19:56:04.338Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T19:56:04.956Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T19:56:05.168Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-14T19:56:05.220Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-14T19:56:06.930Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-14T19:56:07.070Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-14T19:56:07.073Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T19:56:07.073Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T19:56:07.074Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T19:56:07.074Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T19:56:07.172Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T19-56-07.png
+[2026-07-14T20:27:57.624Z] ============================================================
+[2026-07-14T20:27:57.627Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-14T20:27:58.657Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-14T20:27:59.036Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-14T20:27:59.100Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-14T20:28:00.819Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-14T20:28:00.943Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-14T20:28:00.945Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-14T20:28:00.946Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-14T20:28:00.946Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-14T20:28:00.946Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-14T20:28:01.015Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-14T20-28-00.png
+[2026-07-14T21:55:37.706Z] ================================================================
+[2026-07-14T21:55:37.728Z] [INFO]  🧑‍💻 ARES HUMAN SIMULATOR — Alvo: http://localhost:5173
+[2026-07-14T21:55:37.728Z] [INFO]  👤 Credenciais de seed: test@example.com / *****************
+[2026-07-14T21:55:41.943Z] [INFO]  — Passo 2.1: Navegando para a tela de login —
+[2026-07-14T21:55:42.876Z] [INFO]  [UAT][PASS] Passo 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T21:55:42.886Z] [INFO]  [UAT][PASS] Passo 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T21:55:44.005Z] [INFO]  🖱️  Clicando em "Entrar"...
+[2026-07-14T21:55:44.944Z] [INFO]  [UAT][PASS] Passo 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T21:55:46.034Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\01_login_sucesso.png
+[2026-07-14T21:55:46.035Z] [INFO]  — Passo 2.2: Layout, Sidebar e tema —
+[2026-07-14T21:55:46.043Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T21:55:46.051Z] [INFO]  [UAT][PASS] Passo 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T21:55:46.052Z] [INFO]  🖱️  Recolhendo a Sidebar (»)...
+[2026-07-14T21:55:46.797Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T21:55:46.798Z] [INFO]  🖱️  Expandindo a Sidebar («)...
+[2026-07-14T21:55:47.544Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar expandida novamente
+[2026-07-14T21:55:47.549Z] [INFO]  [UAT][PASS] Passo 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T21:55:48.281Z] [INFO]  🖱️  Aplicando "Modo escuro"...
+[2026-07-14T21:55:49.233Z] [INFO]  [UAT][PASS] Passo 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T21:55:49.322Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\02_modo_escuro.png
+[2026-07-14T21:55:49.322Z] [INFO]  🖱️  Restaurando "Modo claro"...
+[2026-07-14T21:55:50.077Z] [INFO]  — Passo 2.3: Criação de card no Kanban —
+[2026-07-14T21:55:50.083Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Backlog": visível
+[2026-07-14T21:55:50.087Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Researching": visível
+[2026-07-14T21:55:50.090Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Planning": visível
+[2026-07-14T21:55:50.094Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Reviewing": visível
+[2026-07-14T21:55:50.099Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Production": visível
+[2026-07-14T21:55:50.103Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Done": visível
+[2026-07-14T21:55:50.103Z] [INFO]  🖱️  Clicando em "+ Novo card"...
+[2026-07-14T21:55:50.866Z] [INFO]  [UAT][PASS] Passo 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T21:55:51.397Z] [INFO]  🖱️  Salvando o card (botão "Salvar")...
+[2026-07-14T21:55:52.942Z] [INFO]  [UAT][PASS] Passo 2.3 — Card criado visível no board: visível
+[2026-07-14T21:55:52.947Z] [INFO]  [UAT][PASS] Passo 2.3 — Código do card gerado: CARD-3879
+[2026-07-14T21:55:53.019Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\03_card_criado.png
+[2026-07-14T21:55:53.019Z] [INFO]  — Passo 2.4: Execução de agente —
+[2026-07-14T21:55:53.902Z] [INFO]  [UAT][PASS] Passo 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T21:55:53.902Z] [INFO]  🖱️  Disparando "▶ Executar agente"...
+[2026-07-14T21:55:55.136Z] [INFO]  [UAT][PASS] Passo 2.4 — Backend acionado (toast de agente: false)
+[2026-07-14T21:55:56.795Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\04_agente_executando.png
+[2026-07-14T21:55:56.795Z] [INFO]  — Passo 2.5: Dashboard de métricas —
+[2026-07-14T21:55:58.327Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Projetos": visível
+[2026-07-14T21:55:58.332Z] [ERROR] [UAT][FAIL] Passo 2.5 — Métrica "Cards concluídos": NÃO encontrado
+[2026-07-14T21:55:58.336Z] [ERROR] [UAT][FAIL] Passo 2.5 — Métrica "Custo total": NÃO encontrado
+[2026-07-14T21:55:58.341Z] [ERROR] [UAT][FAIL] Passo 2.5 — Painel "Orçamento mensal": NÃO encontrado
+[2026-07-14T21:55:58.345Z] [ERROR] [UAT][FAIL] Passo 2.5 — Gráfico "Custo por dia": NÃO encontrado
+[2026-07-14T21:55:58.348Z] [ERROR] [UAT][FAIL] Passo 2.5 — Gráfico "Custo por agente": NÃO encontrado
+[2026-07-14T21:55:58.351Z] [ERROR] [UAT][FAIL] Passo 2.5 — Painel "Execuções por status": NÃO encontrado
+[2026-07-14T21:55:59.197Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\05_dashboard_metricas.png
+[2026-07-14T21:55:59.198Z] [INFO]  — Passo 2.6: Logout —
+[2026-07-14T21:55:59.225Z] [WARN]  [Request Failed] http://localhost:8000/api/v1/cards/161ad36b-a291-4a0c-8522-0027adc5e50a/run — net::ERR_ABORTED
+[2026-07-14T21:56:00.750Z] [INFO]  [UAT][PASS] Passo 2.6 — Tela de login restaurada: true
+[2026-07-14T21:56:00.750Z] [INFO]  [UAT][PASS] Passo 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T21:56:00.795Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\06_logout_tela_login.png
+[2026-07-14T21:56:00.795Z] ----------------------------------------------------------------
+[2026-07-14T21:56:00.795Z] [INFO]  📋 RESUMO UAT — AgentFlow Studio (Interface)
+[2026-07-14T21:56:00.795Z] [INFO]     [PASS] 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T21:56:00.796Z] [INFO]     [PASS] 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T21:56:00.796Z] [INFO]     [PASS] 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T21:56:00.796Z] [INFO]     [PASS] 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T21:56:00.796Z] [INFO]     [PASS] 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.2 — Sidebar expandida novamente
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.3 — Coluna "Backlog": visível
+[2026-07-14T21:56:00.797Z] [INFO]     [PASS] 2.3 — Coluna "Researching": visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Coluna "Planning": visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Coluna "Reviewing": visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Coluna "Production": visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Coluna "Done": visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T21:56:00.798Z] [INFO]     [PASS] 2.3 — Card criado visível no board: visível
+[2026-07-14T21:56:00.799Z] [INFO]     [PASS] 2.3 — Código do card gerado: CARD-3879
+[2026-07-14T21:56:00.799Z] [INFO]     [PASS] 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T21:56:00.799Z] [INFO]     [PASS] 2.4 — Backend acionado (toast de agente: false)
+[2026-07-14T21:56:00.799Z] [INFO]     [PASS] 2.5 — Métrica "Projetos": visível
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Métrica "Cards concluídos": NÃO encontrado
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Métrica "Custo total": NÃO encontrado
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Painel "Orçamento mensal": NÃO encontrado
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Gráfico "Custo por dia": NÃO encontrado
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Gráfico "Custo por agente": NÃO encontrado
+[2026-07-14T21:56:00.800Z] [INFO]     [FAIL] 2.5 — Painel "Execuções por status": NÃO encontrado
+[2026-07-14T21:56:00.801Z] [INFO]     [PASS] 2.6 — Tela de login restaurada: true
+[2026-07-14T21:56:00.801Z] [INFO]     [PASS] 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T21:56:00.801Z] [INFO]     Total: 29 | Passou: 23 | Falhou: 6
+[2026-07-14T21:56:00.801Z] ----------------------------------------------------------------
+[2026-07-14T21:56:00.801Z] [INFO]  ✅ Jornada UAT concluída. Fechando navegador (modo headless) e salvando vídeo.
+[2026-07-14T21:56:00.802Z] [INFO]  🎬 Finalizando vídeo de evidência (Evidencias/)...
+[2026-07-14T21:56:00.802Z] [INFO]  🎬 Vídeo: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\Evidencias\page@f78f22eb2d429b1d69a0e6f127966a92.webm
+[2026-07-14T22:00:00.304Z] ================================================================
+[2026-07-14T22:00:00.305Z] [INFO]  🧑‍💻 ARES HUMAN SIMULATOR — Alvo: http://localhost:5173
+[2026-07-14T22:00:00.305Z] [INFO]  👤 Credenciais de seed: test@example.com / *****************
+[2026-07-14T22:00:00.469Z] [INFO]  — Passo 2.1: Navegando para a tela de login —
+[2026-07-14T22:00:01.387Z] [INFO]  [UAT][PASS] Passo 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:00:01.392Z] [INFO]  [UAT][PASS] Passo 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:00:02.506Z] [INFO]  🖱️  Clicando em "Entrar"...
+[2026-07-14T22:00:03.432Z] [INFO]  [UAT][PASS] Passo 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:00:04.500Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\01_login_sucesso.png
+[2026-07-14T22:00:04.501Z] [INFO]  — Passo 2.2: Layout, Sidebar e tema —
+[2026-07-14T22:00:04.509Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:00:04.519Z] [INFO]  [UAT][PASS] Passo 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:00:04.520Z] [INFO]  🖱️  Recolhendo a Sidebar (»)...
+[2026-07-14T22:00:05.288Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:00:05.288Z] [INFO]  🖱️  Expandindo a Sidebar («)...
+[2026-07-14T22:00:06.026Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar expandida novamente
+[2026-07-14T22:00:06.033Z] [INFO]  [UAT][PASS] Passo 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:00:06.791Z] [INFO]  🖱️  Aplicando "Modo escuro"...
+[2026-07-14T22:00:07.735Z] [INFO]  [UAT][PASS] Passo 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:00:07.800Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\02_modo_escuro.png
+[2026-07-14T22:00:07.801Z] [INFO]  🖱️  Restaurando "Modo claro"...
+[2026-07-14T22:00:08.549Z] [INFO]  — Passo 2.3: Criação de card no Kanban —
+[2026-07-14T22:00:08.553Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:00:08.557Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Researching": visível
+[2026-07-14T22:00:08.560Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Planning": visível
+[2026-07-14T22:00:08.562Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:00:08.565Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Production": visível
+[2026-07-14T22:00:08.568Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Done": visível
+[2026-07-14T22:00:08.568Z] [INFO]  🖱️  Clicando em "+ Novo card"...
+[2026-07-14T22:00:09.325Z] [INFO]  [UAT][PASS] Passo 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:00:09.862Z] [INFO]  🖱️  Salvando o card (botão "Salvar")...
+[2026-07-14T22:00:11.386Z] [INFO]  [UAT][PASS] Passo 2.3 — Card criado visível no board: visível
+[2026-07-14T22:00:11.388Z] [INFO]  [UAT][PASS] Passo 2.3 — Código do card gerado: CARD-7842
+[2026-07-14T22:00:11.446Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\03_card_criado.png
+[2026-07-14T22:00:11.446Z] [INFO]  — Passo 2.4: Execução de agente —
+[2026-07-14T22:00:12.317Z] [INFO]  [UAT][PASS] Passo 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:00:12.317Z] [INFO]  🖱️  Disparando "▶ Executar agente"...
+[2026-07-14T22:00:14.354Z] [INFO]  [UAT][PASS] Passo 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:00:14.355Z] [WARN]  ⚠️ Execução de agente pendente no backend (sem LLM/MCPs no ambiente). Recarregando para liberar o modal...
+[2026-07-14T22:00:14.363Z] [WARN]  [Request Failed] http://localhost:8000/api/v1/cards/e2e61821-dfbe-4e11-9931-253fb0f4afb8/run — net::ERR_ABORTED
+[2026-07-14T22:00:15.453Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\04_agente_executando.png
+[2026-07-14T22:00:15.453Z] [INFO]  — Passo 2.5: Dashboard de métricas —
+[2026-07-14T22:00:16.985Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:00:16.988Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:00:16.990Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:00:16.992Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:00:16.994Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:00:16.998Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:00:17.002Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:00:17.850Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\05_dashboard_metricas.png
+[2026-07-14T22:00:17.850Z] [INFO]  — Passo 2.6: Logout —
+[2026-07-14T22:00:19.393Z] [INFO]  [UAT][PASS] Passo 2.6 — Tela de login restaurada: true
+[2026-07-14T22:00:19.394Z] [INFO]  [UAT][PASS] Passo 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:00:19.432Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\06_logout_tela_login.png
+[2026-07-14T22:00:19.432Z] ----------------------------------------------------------------
+[2026-07-14T22:00:19.432Z] [INFO]  📋 RESUMO UAT — AgentFlow Studio (Interface)
+[2026-07-14T22:00:19.433Z] [INFO]     [PASS] 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:00:19.433Z] [INFO]     [PASS] 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:00:19.433Z] [INFO]     [PASS] 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:00:19.433Z] [INFO]     [PASS] 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.2 — Sidebar expandida novamente
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:00:19.434Z] [INFO]     [PASS] 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:00:19.435Z] [INFO]     [PASS] 2.3 — Coluna "Researching": visível
+[2026-07-14T22:00:19.435Z] [INFO]     [PASS] 2.3 — Coluna "Planning": visível
+[2026-07-14T22:00:19.435Z] [INFO]     [PASS] 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:00:19.435Z] [INFO]     [PASS] 2.3 — Coluna "Production": visível
+[2026-07-14T22:00:19.435Z] [INFO]     [PASS] 2.3 — Coluna "Done": visível
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.3 — Card criado visível no board: visível
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.3 — Código do card gerado: CARD-7842
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:00:19.436Z] [INFO]     [PASS] 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:00:19.437Z] [INFO]     [PASS] 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:00:19.438Z] [INFO]     [PASS] 2.6 — Tela de login restaurada: true
+[2026-07-14T22:00:19.438Z] [INFO]     [PASS] 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:00:19.438Z] [INFO]     Total: 29 | Passou: 29 | Falhou: 0
+[2026-07-14T22:00:19.438Z] ----------------------------------------------------------------
+[2026-07-14T22:00:19.438Z] [INFO]  ✅ Jornada UAT concluída. Fechando navegador (modo headless) e salvando vídeo.
+[2026-07-14T22:00:19.438Z] [INFO]  🎬 Finalizando vídeo de evidência (Evidencias/)...
+[2026-07-14T22:00:19.439Z] [INFO]  🎬 Vídeo: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\Evidencias\page@9f48d7f319f9775fd53e65bcf3ad10ac.webm
+[2026-07-14T22:19:16.760Z] ================================================================
+[2026-07-14T22:19:16.761Z] [INFO]  🧑‍💻 ARES HUMAN SIMULATOR — Alvo: http://localhost:5173
+[2026-07-14T22:19:16.762Z] [INFO]  👤 Credenciais de seed: test@example.com / *****************
+[2026-07-14T22:19:18.037Z] [INFO]  — Passo 2.1: Navegando para a tela de login —
+[2026-07-14T22:19:19.065Z] [INFO]  [UAT][PASS] Passo 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:19:19.071Z] [INFO]  [UAT][PASS] Passo 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:19:20.575Z] [INFO]  🖱️  Clicando em "Entrar"...
+[2026-07-14T22:19:21.550Z] [INFO]  [UAT][PASS] Passo 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:19:22.665Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\01_login_sucesso.png
+[2026-07-14T22:19:22.666Z] [INFO]  — Passo 2.2: Layout, Sidebar e tema —
+[2026-07-14T22:19:22.675Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:19:22.685Z] [INFO]  [UAT][PASS] Passo 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:19:22.685Z] [INFO]  🖱️  Recolhendo a Sidebar (»)...
+[2026-07-14T22:19:23.554Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:19:23.554Z] [INFO]  🖱️  Expandindo a Sidebar («)...
+[2026-07-14T22:19:24.385Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T22:19:24.391Z] [INFO]  [UAT][PASS] Passo 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:19:25.226Z] [INFO]  🖱️  Aplicando "Modo escuro"...
+[2026-07-14T22:19:26.275Z] [INFO]  [UAT][PASS] Passo 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:19:26.372Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\02_modo_escuro.png
+[2026-07-14T22:19:26.373Z] [INFO]  🖱️  Restaurando "Modo claro"...
+[2026-07-14T22:19:27.226Z] [INFO]  — Passo 2.3: Criação de card no Kanban —
+[2026-07-14T22:19:27.234Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:19:27.238Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Researching": visível
+[2026-07-14T22:19:27.241Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Planning": visível
+[2026-07-14T22:19:27.246Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:19:27.249Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Production": visível
+[2026-07-14T22:19:27.253Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Done": visível
+[2026-07-14T22:19:27.253Z] [INFO]  🖱️  Clicando em "+ Novo card"...
+[2026-07-14T22:19:28.156Z] [INFO]  [UAT][PASS] Passo 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:19:28.896Z] [INFO]  🖱️  Salvando o card (botão "Salvar")...
+[2026-07-14T22:19:30.518Z] [INFO]  [UAT][PASS] Passo 2.3 — Card criado visível no board: visível
+[2026-07-14T22:19:30.521Z] [INFO]  [UAT][PASS] Passo 2.3 — Código do card gerado: CARD-8339
+[2026-07-14T22:19:30.612Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\03_card_criado.png
+[2026-07-14T22:19:30.612Z] [INFO]  — Passo 2.4: Execução de agente —
+[2026-07-14T22:19:31.594Z] [INFO]  [UAT][PASS] Passo 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:19:31.594Z] [INFO]  🖱️  Disparando "▶ Executar agente"...
+[2026-07-14T22:19:33.731Z] [INFO]  [UAT][PASS] Passo 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:19:33.732Z] [WARN]  ⚠️ Execução de agente pendente no backend (sem LLM/MCPs no ambiente). Recarregando para liberar o modal...
+[2026-07-14T22:19:33.753Z] [WARN]  [Request Failed] http://localhost:8000/api/v1/cards/05a0f4a4-4353-486c-b504-433551f81c6c/run — net::ERR_ABORTED
+[2026-07-14T22:19:36.645Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\04_agente_executando.png
+[2026-07-14T22:19:36.645Z] [INFO]  — Passo 2.5: Dashboard de métricas —
+[2026-07-14T22:19:38.291Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:19:38.293Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:19:38.295Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:19:38.297Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:19:38.298Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:19:38.300Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:19:38.303Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:19:39.177Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\05_dashboard_metricas.png
+[2026-07-14T22:19:39.177Z] [INFO]  — Passo 2.6: Logout —
+[2026-07-14T22:19:40.854Z] [INFO]  [UAT][PASS] Passo 2.6 — Tela de login restaurada: true
+[2026-07-14T22:19:40.854Z] [INFO]  [UAT][PASS] Passo 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:19:40.924Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\06_logout_tela_login.png
+[2026-07-14T22:19:40.924Z] ----------------------------------------------------------------
+[2026-07-14T22:19:40.924Z] [INFO]  📋 RESUMO UAT — AgentFlow Studio (Interface)
+[2026-07-14T22:19:40.925Z] [INFO]     [PASS] 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:19:40.925Z] [INFO]     [PASS] 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:19:40.925Z] [INFO]     [PASS] 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:19:40.925Z] [INFO]     [PASS] 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:19:40.926Z] [INFO]     [PASS] 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:19:40.927Z] [INFO]     [PASS] 2.3 — Coluna "Researching": visível
+[2026-07-14T22:19:40.927Z] [INFO]     [PASS] 2.3 — Coluna "Planning": visível
+[2026-07-14T22:19:40.927Z] [INFO]     [PASS] 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:19:40.927Z] [INFO]     [PASS] 2.3 — Coluna "Production": visível
+[2026-07-14T22:19:40.927Z] [INFO]     [PASS] 2.3 — Coluna "Done": visível
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.3 — Card criado visível no board: visível
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.3 — Código do card gerado: CARD-8339
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:19:40.928Z] [INFO]     [PASS] 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:19:40.929Z] [INFO]     [PASS] 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:19:40.930Z] [INFO]     [PASS] 2.6 — Tela de login restaurada: true
+[2026-07-14T22:19:40.930Z] [INFO]     [PASS] 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:19:40.930Z] [INFO]     Total: 29 | Passou: 29 | Falhou: 0
+[2026-07-14T22:19:40.930Z] ----------------------------------------------------------------
+[2026-07-14T22:19:40.930Z] [INFO]  ✅ Jornada UAT concluída. Navegador permanece aberto para inspeção visual.
+[2026-07-14T22:19:40.931Z] [INFO]  💡 Pressione Ctrl+C para encerrar e salvar o vídeo de evidência (Evidencias/).
+[2026-07-14T22:35:19.078Z] ================================================================
+[2026-07-14T22:35:19.080Z] [INFO]  🧑‍💻 ARES HUMAN SIMULATOR — Alvo: http://localhost:5173
+[2026-07-14T22:35:19.080Z] [INFO]  👤 Credenciais de seed: test@example.com / *****************
+[2026-07-14T22:35:20.266Z] [INFO]  — Passo 2.1: Navegando para a tela de login —
+[2026-07-14T22:35:22.795Z] [INFO]  [UAT][PASS] Passo 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:35:22.803Z] [INFO]  [UAT][PASS] Passo 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:35:23.907Z] [INFO]  🖱️  Clicando em "Entrar"...
+[2026-07-14T22:35:27.334Z] [INFO]  [UAT][PASS] Passo 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:35:28.424Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\01_login_sucesso.png
+[2026-07-14T22:35:28.425Z] [INFO]  — Passo 2.2: Layout, Sidebar e tema —
+[2026-07-14T22:35:28.434Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:35:28.444Z] [INFO]  [UAT][PASS] Passo 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:35:28.445Z] [INFO]  🖱️  Recolhendo a Sidebar (»)...
+[2026-07-14T22:35:29.194Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:35:29.195Z] [INFO]  🖱️  Expandindo a Sidebar («)...
+[2026-07-14T22:35:29.920Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T22:35:29.925Z] [INFO]  [UAT][PASS] Passo 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:35:30.670Z] [INFO]  🖱️  Aplicando "Modo escuro"...
+[2026-07-14T22:35:31.607Z] [INFO]  [UAT][PASS] Passo 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:35:31.671Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\02_modo_escuro.png
+[2026-07-14T22:35:31.671Z] [INFO]  🖱️  Restaurando "Modo claro"...
+[2026-07-14T22:35:32.419Z] [INFO]  — Passo 2.3: Criação de card no Kanban —
+[2026-07-14T22:35:32.426Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:35:32.429Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Researching": visível
+[2026-07-14T22:35:32.432Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Planning": visível
+[2026-07-14T22:35:32.435Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:35:32.438Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Production": visível
+[2026-07-14T22:35:32.442Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Done": visível
+[2026-07-14T22:35:32.442Z] [INFO]  🖱️  Clicando em "+ Novo card"...
+[2026-07-14T22:35:33.220Z] [INFO]  [UAT][PASS] Passo 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:35:33.755Z] [INFO]  🖱️  Salvando o card (botão "Salvar")...
+[2026-07-14T22:35:35.294Z] [INFO]  [UAT][PASS] Passo 2.3 — Card criado visível no board: visível
+[2026-07-14T22:35:35.296Z] [INFO]  [UAT][PASS] Passo 2.3 — Código do card gerado: CARD-7853
+[2026-07-14T22:35:35.346Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\03_card_criado.png
+[2026-07-14T22:35:35.347Z] [INFO]  — Passo 2.4: Execução de agente —
+[2026-07-14T22:35:36.216Z] [INFO]  [UAT][PASS] Passo 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:35:36.217Z] [INFO]  🖱️  Disparando "▶ Executar agente"...
+[2026-07-14T22:35:38.263Z] [INFO]  [UAT][PASS] Passo 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:35:38.263Z] [WARN]  ⚠️ Execução de agente pendente no backend (sem LLM/MCPs no ambiente). Recarregando para liberar o modal...
+[2026-07-14T22:35:38.273Z] [WARN]  [Request Failed] http://localhost:8000/api/v1/cards/a5a9ac54-2d10-436f-aa9e-e44db7753023/run — net::ERR_ABORTED
+[2026-07-14T22:35:39.275Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\04_agente_executando.png
+[2026-07-14T22:35:39.275Z] [INFO]  — Passo 2.5: Dashboard de métricas —
+[2026-07-14T22:35:40.816Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:35:40.818Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:35:40.820Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:35:40.822Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:35:40.824Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:35:40.825Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:35:40.826Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:35:41.663Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\05_dashboard_metricas.png
+[2026-07-14T22:35:41.664Z] [INFO]  — Passo 2.6: Logout —
+[2026-07-14T22:35:43.213Z] [INFO]  [UAT][PASS] Passo 2.6 — Tela de login restaurada: true
+[2026-07-14T22:35:43.214Z] [INFO]  [UAT][PASS] Passo 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:35:43.243Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\06_logout_tela_login.png
+[2026-07-14T22:35:43.243Z] ----------------------------------------------------------------
+[2026-07-14T22:35:43.243Z] [INFO]  📋 RESUMO UAT — AgentFlow Studio (Interface)
+[2026-07-14T22:35:43.244Z] [INFO]     [PASS] 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T22:35:43.244Z] [INFO]     [PASS] 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T22:35:43.244Z] [INFO]     [PASS] 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T22:35:43.244Z] [INFO]     [PASS] 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T22:35:43.244Z] [INFO]     [PASS] 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.3 — Coluna "Backlog": visível
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.3 — Coluna "Researching": visível
+[2026-07-14T22:35:43.245Z] [INFO]     [PASS] 2.3 — Coluna "Planning": visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Coluna "Reviewing": visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Coluna "Production": visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Coluna "Done": visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Card criado visível no board: visível
+[2026-07-14T22:35:43.246Z] [INFO]     [PASS] 2.3 — Código do card gerado: CARD-7853
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.5 — Métrica "Projetos": visível
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.5 — Métrica "Custo total": visível
+[2026-07-14T22:35:43.247Z] [INFO]     [PASS] 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T22:35:43.248Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T22:35:43.248Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T22:35:43.248Z] [INFO]     [PASS] 2.5 — Painel "Execuções por status": visível
+[2026-07-14T22:35:43.248Z] [INFO]     [PASS] 2.6 — Tela de login restaurada: true
+[2026-07-14T22:35:43.248Z] [INFO]     [PASS] 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T22:35:43.248Z] [INFO]     Total: 29 | Passou: 29 | Falhou: 0
+[2026-07-14T22:35:43.248Z] ----------------------------------------------------------------
+[2026-07-14T22:35:43.249Z] [INFO]  ✅ Jornada UAT concluída. Fechando navegador (modo headless) e salvando vídeo.
+[2026-07-14T22:35:43.249Z] [INFO]  🎬 Finalizando vídeo de evidência (Evidencias/)...
+[2026-07-14T22:35:43.249Z] [INFO]  🎬 Vídeo: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\Evidencias\page@04ab9daab7f319057a8594eddc323bab.webm
+[2026-07-14T23:02:51.266Z] ================================================================
+[2026-07-14T23:02:51.268Z] [INFO]  🧑‍💻 ARES HUMAN SIMULATOR — Alvo: http://localhost:5173
+[2026-07-14T23:02:51.268Z] [INFO]  👤 Credenciais de seed: test@example.com / *****************
+[2026-07-14T23:02:51.416Z] [INFO]  — Passo 2.1: Navegando para a tela de login —
+[2026-07-14T23:02:52.369Z] [INFO]  [UAT][PASS] Passo 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T23:02:52.374Z] [INFO]  [UAT][PASS] Passo 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T23:02:53.446Z] [INFO]  🖱️  Clicando em "Entrar"...
+[2026-07-14T23:02:54.275Z] [INFO]  [UAT][PASS] Passo 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T23:02:55.335Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\01_login_sucesso.png
+[2026-07-14T23:02:55.335Z] [INFO]  — Passo 2.2: Layout, Sidebar e tema —
+[2026-07-14T23:02:55.343Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T23:02:55.352Z] [INFO]  [UAT][PASS] Passo 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T23:02:55.352Z] [INFO]  🖱️  Recolhendo a Sidebar (»)...
+[2026-07-14T23:02:56.105Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T23:02:56.105Z] [INFO]  🖱️  Expandindo a Sidebar («)...
+[2026-07-14T23:02:56.846Z] [INFO]  [UAT][PASS] Passo 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T23:02:56.851Z] [INFO]  [UAT][PASS] Passo 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T23:02:57.586Z] [INFO]  🖱️  Aplicando "Modo escuro"...
+[2026-07-14T23:02:58.534Z] [INFO]  [UAT][PASS] Passo 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T23:02:58.591Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\02_modo_escuro.png
+[2026-07-14T23:02:58.591Z] [INFO]  🖱️  Restaurando "Modo claro"...
+[2026-07-14T23:02:59.349Z] [INFO]  — Passo 2.3: Criação de card no Kanban —
+[2026-07-14T23:02:59.354Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Backlog": visível
+[2026-07-14T23:02:59.357Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Researching": visível
+[2026-07-14T23:02:59.359Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Planning": visível
+[2026-07-14T23:02:59.362Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Reviewing": visível
+[2026-07-14T23:02:59.364Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Production": visível
+[2026-07-14T23:02:59.368Z] [INFO]  [UAT][PASS] Passo 2.3 — Coluna "Done": visível
+[2026-07-14T23:02:59.368Z] [INFO]  🖱️  Clicando em "+ Novo card"...
+[2026-07-14T23:03:00.152Z] [INFO]  [UAT][PASS] Passo 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T23:03:00.701Z] [INFO]  🖱️  Salvando o card (botão "Salvar")...
+[2026-07-14T23:03:02.237Z] [INFO]  [UAT][PASS] Passo 2.3 — Card criado visível no board: visível
+[2026-07-14T23:03:02.241Z] [INFO]  [UAT][PASS] Passo 2.3 — Código do card gerado: CARD-9770
+[2026-07-14T23:03:02.316Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\03_card_criado.png
+[2026-07-14T23:03:02.316Z] [INFO]  — Passo 2.4: Execução de agente —
+[2026-07-14T23:03:03.198Z] [INFO]  [UAT][PASS] Passo 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T23:03:03.199Z] [INFO]  🖱️  Disparando "▶ Executar agente"...
+[2026-07-14T23:03:05.243Z] [INFO]  [UAT][PASS] Passo 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T23:03:05.244Z] [WARN]  ⚠️ Execução de agente pendente no backend (sem LLM/MCPs no ambiente). Recarregando para liberar o modal...
+[2026-07-14T23:03:05.253Z] [WARN]  [Request Failed] http://localhost:8000/api/v1/cards/7be61af0-e23e-4e7e-b388-3d6f357033d9/run — net::ERR_ABORTED
+[2026-07-14T23:03:06.500Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\04_agente_executando.png
+[2026-07-14T23:03:06.500Z] [INFO]  — Passo 2.5: Dashboard de métricas —
+[2026-07-14T23:03:08.037Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Projetos": visível
+[2026-07-14T23:03:08.039Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T23:03:08.041Z] [INFO]  [UAT][PASS] Passo 2.5 — Métrica "Custo total": visível
+[2026-07-14T23:03:08.043Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T23:03:08.045Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T23:03:08.047Z] [INFO]  [UAT][PASS] Passo 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T23:03:08.049Z] [INFO]  [UAT][PASS] Passo 2.5 — Painel "Execuções por status": visível
+[2026-07-14T23:03:08.889Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\05_dashboard_metricas.png
+[2026-07-14T23:03:08.889Z] [INFO]  — Passo 2.6: Logout —
+[2026-07-14T23:03:10.433Z] [INFO]  [UAT][PASS] Passo 2.6 — Tela de login restaurada: true
+[2026-07-14T23:03:10.434Z] [INFO]  [UAT][PASS] Passo 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T23:03:10.489Z] [INFO]  📸 Screenshot: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\06_logout_tela_login.png
+[2026-07-14T23:03:10.490Z] ----------------------------------------------------------------
+[2026-07-14T23:03:10.490Z] [INFO]  📋 RESUMO UAT — AgentFlow Studio (Interface)
+[2026-07-14T23:03:10.490Z] [INFO]     [PASS] 2.1 — Título "AgentFlow Studio": visível
+[2026-07-14T23:03:10.490Z] [INFO]     [PASS] 2.1 — Subtítulo "Entre para acessar o board.": visível
+[2026-07-14T23:03:10.491Z] [INFO]     [PASS] 2.1 — Redirecionado para o Dashboard/Kanban (login OK)
+[2026-07-14T23:03:10.491Z] [INFO]     [PASS] 2.2 — Sidebar (aside) renderizada: visível
+[2026-07-14T23:03:10.491Z] [INFO]     [PASS] 2.2 — Seção "Workspace" na Sidebar: visível
+[2026-07-14T23:03:10.491Z] [INFO]     [PASS] 2.2 — Sidebar colapsada (classe w-16 aplicada)
+[2026-07-14T23:03:10.492Z] [INFO]     [PASS] 2.2 — Sidebar expandida (clique físico OK)
+[2026-07-14T23:03:10.492Z] [INFO]     [PASS] 2.2 — Marca "AgentFlow" visível após expandir: visível
+[2026-07-14T23:03:10.492Z] [INFO]     [PASS] 2.2 — data-theme=dark: true | class ".dark" presente: true
+[2026-07-14T23:03:10.492Z] [INFO]     [PASS] 2.3 — Coluna "Backlog": visível
+[2026-07-14T23:03:10.492Z] [INFO]     [PASS] 2.3 — Coluna "Researching": visível
+[2026-07-14T23:03:10.493Z] [INFO]     [PASS] 2.3 — Coluna "Planning": visível
+[2026-07-14T23:03:10.493Z] [INFO]     [PASS] 2.3 — Coluna "Reviewing": visível
+[2026-07-14T23:03:10.493Z] [INFO]     [PASS] 2.3 — Coluna "Production": visível
+[2026-07-14T23:03:10.493Z] [INFO]     [PASS] 2.3 — Coluna "Done": visível
+[2026-07-14T23:03:10.493Z] [INFO]     [PASS] 2.3 — Campo "Título do card" no modal: visível
+[2026-07-14T23:03:10.494Z] [INFO]     [PASS] 2.3 — Card criado visível no board: visível
+[2026-07-14T23:03:10.494Z] [INFO]     [PASS] 2.3 — Código do card gerado: CARD-9770
+[2026-07-14T23:03:10.494Z] [INFO]     [PASS] 2.4 — Botão "Executar agente" no CardModal: visível
+[2026-07-14T23:03:10.494Z] [INFO]     [PASS] 2.4 — Backend acionado (toast: false; modal aberto pós-run: 1)
+[2026-07-14T23:03:10.494Z] [INFO]     [PASS] 2.5 — Métrica "Projetos": visível
+[2026-07-14T23:03:10.495Z] [INFO]     [PASS] 2.5 — Métrica "Cards concluídos": visível
+[2026-07-14T23:03:10.495Z] [INFO]     [PASS] 2.5 — Métrica "Custo total": visível
+[2026-07-14T23:03:10.496Z] [INFO]     [PASS] 2.5 — Painel "Orçamento mensal": visível
+[2026-07-14T23:03:10.496Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por dia": visível
+[2026-07-14T23:03:10.496Z] [INFO]     [PASS] 2.5 — Gráfico "Custo por agente": visível
+[2026-07-14T23:03:10.496Z] [INFO]     [PASS] 2.5 — Painel "Execuções por status": visível
+[2026-07-14T23:03:10.496Z] [INFO]     [PASS] 2.6 — Tela de login restaurada: true
+[2026-07-14T23:03:10.497Z] [INFO]     [PASS] 2.6 — Credencial (af_token) removida do localStorage: true
+[2026-07-14T23:03:10.497Z] [INFO]     Total: 29 | Passou: 29 | Falhou: 0
+[2026-07-14T23:03:10.497Z] ----------------------------------------------------------------
+[2026-07-14T23:03:10.497Z] [INFO]  ✅ Jornada UAT concluída. Fechando navegador (modo headless) e salvando vídeo.
+[2026-07-14T23:03:10.498Z] [INFO]  🎬 Finalizando vídeo de evidência (Evidencias/)...
+[2026-07-14T23:03:10.498Z] [INFO]  🎬 Vídeo: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\Evidencias\page@07836f2b9b8712d6f15134cfa4ff3c98.webm
+[2026-07-15T00:23:00.233Z] ============================================================
+[2026-07-15T00:23:00.237Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-15T00:23:01.946Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-15T00:23:02.198Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-15T00:23:02.258Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-15T00:23:03.972Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-15T00:23:04.098Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-15T00:23:04.100Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-15T00:23:04.101Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-15T00:23:04.101Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-15T00:23:04.102Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-15T00:23:04.171Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-15T00-23-04.png
+[2026-07-15T01:52:36.079Z] ============================================================
+[2026-07-15T01:52:36.081Z] [INFO]  🚀 ARES VISUAL STANDARD — Alvo: http://localhost:5173
+[2026-07-15T01:52:37.135Z] [INFO]  🌐 Navegando para http://localhost:5173/...
+[2026-07-15T01:52:37.381Z] [INFO]  🔍 Aguardando seletor de login "input[type="email"]" por 5000ms...
+[2026-07-15T01:52:37.440Z] [INFO]  ✍️  Preenchendo credenciais...
+[2026-07-15T01:52:39.157Z] [INFO]  🖱️  Clicando em Login...
+[2026-07-15T01:52:39.293Z] [INFO]  ⏳ Aguardando redirecionamento para o dashboard...
+[2026-07-15T01:52:39.296Z] [INFO]  ✅ SUCESSO: Dashboard/Home alcançado!
+[2026-07-15T01:52:39.296Z] [INFO]  📍 URL atual: http://localhost:5173/
+[2026-07-15T01:52:39.296Z] [INFO]  👀 Navegador Playwright permanece aberto para inspeção visual.
+[2026-07-15T01:52:39.297Z] [INFO]  💡 Dica: Use F12 (Console do Chromium) para inspecionar hidratação e rede.
+[2026-07-15T01:52:39.384Z] [INFO]  📸 Screenshot salva: F:\Criando sites pelo pc\Site AgentFlow Studio\Ambiente Testes\screenshots\success_2026-07-15T01-52-39.png

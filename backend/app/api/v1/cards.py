@@ -1,0 +1,145 @@
+"""API de Cards (Kanban) — CRUD + movimentação de coluna com envelope padronizado."""
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_session
+from app.core.exceptions import NotFoundError, ValidationError
+from app.api.v1.deps import get_request_id
+from app.core.responses import paginated_envelope, success_envelope
+from app.models.card import KANBAN_COLUMNS, Card
+from app.models.project import Project
+from app.schemas.card import CardCreate, CardResponse, CardUpdate
+from app.services.event_bus import Event, event_bus
+from app.services.prompt_hydration import hydrate_prompt
+
+router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+@router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
+async def create_card(
+    body: CardCreate, request_id: str = Depends(get_request_id), session: AsyncSession = Depends(get_session)
+) -> dict:
+    project = await session.get(Project, body.project_id)
+    if not project:
+        raise ValidationError("project_id invalido ou inexistente")
+    # Item C: hidrata o título do usuário (PT informal -> EN técnico + regras).
+    meta = dict(body.meta or {})
+    hydrated = hydrate_prompt(body.title, project_context={"name": project.name})
+    if hydrated:
+        meta["hydrated_prompt"] = hydrated
+    card = Card(
+        project_id=body.project_id,
+        title=body.title,
+        column=body.column,
+        order_index=body.order_index,
+        meta=meta,
+    )
+    session.add(card)
+    await session.commit()
+    await session.refresh(card)
+    # Publica evento para o WebSocket de compartilhamento (Item D).
+    event_bus.publish(
+        Event(type="card.created", payload={"card_id": str(card.id), "project_id": str(card.project_id), "column": card.column})
+    )
+    return success_envelope(
+        data=CardResponse.model_validate(card).model_dump(mode="json"),
+        request_id=request_id,
+    )
+
+
+@router.get("", response_model=None)
+async def list_cards(
+    request_id: str = Depends(get_request_id),
+
+    session: AsyncSession = Depends(get_session),
+    project_id: UUID | None = Query(default=None),
+    column: str | None = Query(default=None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+) -> dict:
+    stmt = select(Card)
+    if project_id is not None:
+        stmt = stmt.where(Card.project_id == project_id)
+    if column is not None:
+        if column not in KANBAN_COLUMNS:
+            raise ValidationError(f"coluna invalida: {column}")
+        stmt = stmt.where(Card.column == column)
+    total = (
+        await session.scalar(
+            select(func.count()).select_from(stmt.subquery())
+        )
+        or 0
+    )
+    offset = (page - 1) * per_page
+    rows = (
+        await session.scalars(
+            stmt.offset(offset).limit(per_page).order_by(Card.order_index)
+        )
+    ).all()
+    items = [CardResponse.model_validate(r).model_dump(mode="json") for r in rows]
+    return paginated_envelope(
+        data=items, total=total, page=page, per_page=per_page, request_id=request_id
+    )
+
+
+@router.get("/{card_id}", response_model=None)
+async def get_card(
+    card_id: UUID, request_id: str = Depends(get_request_id), session: AsyncSession = Depends(get_session)
+) -> dict:
+    card = await session.get(Card, card_id)
+    if not card:
+        raise NotFoundError("Card", str(card_id))
+    return success_envelope(
+        data=CardResponse.model_validate(card).model_dump(mode="json"),
+        request_id=request_id,
+    )
+
+
+@router.patch("/{card_id}", response_model=None)
+async def update_card(
+    card_id: UUID,
+    body: CardUpdate,
+    request_id: str = Depends(get_request_id),
+
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    card = await session.get(Card, card_id)
+    if not card:
+        raise NotFoundError("Card", str(card_id))
+    if body.title is not None:
+        card.title = body.title
+    if body.column is not None:
+        if body.column not in KANBAN_COLUMNS:
+            raise ValidationError(f"coluna invalida: {body.column}")
+        card.column = body.column
+    if body.order_index is not None:
+        card.order_index = body.order_index
+    if body.confidence_score is not None:
+        card.confidence_score = body.confidence_score
+    if body.approval_by is not None:
+        card.approval_by = body.approval_by
+    if body.meta is not None:
+        merged = dict(card.meta or {})
+        merged.update(body.meta)
+        card.meta = merged
+    await session.commit()
+    await session.refresh(card)
+    return success_envelope(
+        data=CardResponse.model_validate(card).model_dump(mode="json"),
+        request_id=request_id,
+    )
+
+
+@router.delete("/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_card(
+    card_id: UUID, session: AsyncSession = Depends(get_session)
+) -> None:
+    card = await session.get(Card, card_id)
+    if not card:
+        raise NotFoundError("Card", str(card_id))
+    await session.delete(card)
+    await session.commit()

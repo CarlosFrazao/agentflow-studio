@@ -1,0 +1,236 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+/* ===================== SIDEBAR RESPONSIVA ===================== */
+/* Em telas < lg (1024px) a sidebar colapsa para modo compacto (64px) via
+   CSS puro, liberando espaço para o conteúdo caber na viewport (320/768px).
+   Usar !important garante que vence a largura base (w-[var(--side)]). */
+@media (max-width: 1023px) {
+  .af-sidebar {
+    width: 64px !important;
+  }
+  .af-sidebar-label {
+    display: none !important;
+  }
+  .af-sidebar-center {
+    justify-content: center !important;
+  }
+}
+
+/* ===================== TOKENS (portados do AgentFlow_Studio_Kanban_Interativo.html) ===================== */
+:root,
+[data-theme="dark"] {
+  --bg: #0e1319;
+  --bg-grid: rgba(255, 255, 255, 0.025);
+  --surface: #161c24;
+  --surface-2: #1c242e;
+  --surface-3: #222c38;
+  --border: #28323e;
+  --border-strong: #374251;
+  --text: #e7edf3;
+  --text-2: #9ba9b8;
+  --muted: #697886;
+  --accent: #2dd4bf;
+  --accent-2: #38bdf8;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --accent-text: #7fe9dd;
+  --p0: #f5a524;
+  --p0-bg: rgba(245, 165, 36, 0.14);
+  --p1: #8b97a7;
+  --p1-bg: rgba(139, 151, 167, 0.14);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.12);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --phase0: #94a3b8;
+  --phase1: #60a5fa;
+  --phase2: #a78bfa;
+  --phase3: #f5a524;
+  --phase35: #f472b6;
+  --shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  --side: 248px;
+}
+
+[data-theme="light"] {
+  --bg: #eef1f6;
+  --bg-grid: rgba(15, 23, 42, 0.03);
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --surface-3: #eef2f7;
+  --border: #e3e8ef;
+  --border-strong: #cdd5e0;
+  --text: #16202e;
+  --text-2: #566374;
+  --muted: #8a95a3;
+  --accent: #0d9488;
+  --accent-2: #0284c7;
+  --accent-soft: rgba(13, 148, 136, 0.1);
+  --accent-text: #0f766e;
+  --p0: #d97706;
+  --p0-bg: rgba(217, 119, 6, 0.12);
+  --p1: #64748b;
+  --p1-bg: rgba(100, 116, 139, 0.12);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --ok: #059669;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --phase0: #64748b;
+  --phase1: #2563eb;
+  --phase2: #7c3aed;
+  --phase3: #d97706;
+  --phase35: #db2777;
+  --shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.25);
+  --shadow-sm: 0 1px 4px -1px rgba(15, 23, 42, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+#root {
+  /* Ocupa 100% da viewport: sem isso, o flex-item encolhe ao conteúdo
+     e a UI aparece comprimida no centro (efeito "modo celular"). */
+  width: 100%;
+}
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  transition: background 0.25s, color 0.25s;
+}
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+button {
+  font-family: inherit;
+}
+
+/* ===================== TOASTS (tokens) ===================== */
+.toasts {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 80;
+  width: min(340px, calc(100vw - 36px));
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  animation: toastIn 0.25s ease;
+}
+.toast.success {
+  border-left-color: var(--ok);
+}
+.toast.error {
+  border-left-color: var(--danger);
+}
+.toast.warn {
+  border-left-color: var(--warn);
+}
+.toast.info {
+  border-left-color: var(--accent-2);
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===================== SCROLLBAR (visível apenas onde necessário) ===================== */
+/* Oculta a scrollbar global; componentes que precisam (ex: board do Kanban)
+   reativam via a classe utilitária .af-scroll-x / .af-scroll-y. */
+.af-scroll-x,
+.af-scroll-y {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.af-scroll-x::-webkit-scrollbar,
+.af-scroll-y::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.af-scroll-x::-webkit-scrollbar-thumb,
+.af-scroll-y::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.af-scroll-x::-webkit-scrollbar-thumb:hover,
+.af-scroll-y::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+
+/* ===================== ANIMAÇÕES ===================== */
+@keyframes af-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.af-fade {
+  animation: af-fade 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-fade,
+  .toast {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

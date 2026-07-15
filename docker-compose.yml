@@ -1,0 +1,54 @@
+# AgentFlow Studio — orquestração multi-agente Kanban (MVP v1.1)
+#
+# SRA e Firecrawl JÁ rodam em containers próprios no Docker Desktop do usuário.
+# O AgentFlow conecta-se a eles como CLIENTE MCP (SSE remoto) — não os incorpora.
+# Junta-se à rede externa `firecrawl_backend` já criada pelo Firecrawl.
+#
+# Ordem de subida recomendada (no Docker Desktop):
+#   1. Firecrawl  (cria a rede `firecrawl_backend`)
+#   2. SRA        (se junta à mesma rede)
+#   3. AgentFlow  (este compose)
+
+services:
+  agentflow-backend:
+    build: ./backend
+    container_name: agentflow-backend
+    init: true
+    tty: true
+    stdin_open: true
+    env_file: ./backend/.env
+    environment:
+      # URLs MCP validadas pelo usuário (2026-07-11)
+      - SRA_MCP_URL=http://sra-app:3458/mcp/sse
+      - FIRECRAWL_MCP_URL=http://firecrawl-api-new:3002/mcp/sse
+      - FIRECRAWL_REST_URL=http://firecrawl-api-new:3002
+      - DATABASE_URL=sqlite+aiosqlite:///./data/agentflow.db
+    volumes:
+      - agentflow-data:/app/data
+    ports:
+      - "8000:8000"
+    networks:
+      - default
+      - firecrawl_backend
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  agentflow-frontend:
+    build: ./frontend
+    container_name: agentflow-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - agentflow-backend
+    networks:
+      - default
+    restart: unless-stopped
+
+networks:
+  default:
+    name: agentflow-studio_default
+  firecrawl_backend:
+    external: true
+
+volumes:
+  agentflow-data:

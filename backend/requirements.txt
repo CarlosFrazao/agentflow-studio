@@ -1,0 +1,18 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+sqlalchemy[asyncio]>=2.0
+alembic>=1.13
+aiosqlite>=0.19
+pydantic>=2.6
+pydantic-settings>=2.1
+email-validator>=2.1
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+# pin bcrypt: 4.1+ removed the __about__ attr that passlib 1.7.4 reads,
+# causing "password cannot be longer than 72 bytes". 4.0.1 is the last safe.
+bcrypt==4.0.1
+httpx>=0.27
+mcp>=1.2
+structlog>=24.1
+google-genai>=1.0
+# (google-generativeai removido: pacote legado, sem atualizações; use google-genai)

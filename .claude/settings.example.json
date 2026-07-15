@@ -1,0 +1,37 @@
+﻿{
+  "env": {
+    "__comment": "Copie este arquivo para .claude/settings.json e configure suas chaves localmente. NUNCA commite o settings.json real — ele contém API keys.",
+
+    "__comment_modo_1": "=== MODO 1: OPENROUTER DIRETO (Recomendado) ===",
+    "x_ANTHROPIC_BASE_URL": "https://openrouter.ai/api/v1",
+    "x_ANTHROPIC_AUTH_TOKEN": "sk-or-v1-SUA-CHAVE-OPENROUTER-AQUI",
+
+    "__comment_modo_2": "=== MODO 2: LITELLM PROXY LOCAL (Porta 4004) ===",
+    "x_ANTHROPIC_BASE_URL": "http://localhost:4004",
+    "x_ANTHROPIC_AUTH_TOKEN": "SUA-CHAVE-AQUI",
+
+    "__comment_modelos": "=== MODELOS GRATUITOS RECOMENDADOS (OpenRouter) ===",
+    "__comment_modelos_info": "Descomente (remova o x_) o modelo que quiser usar. Apenas um ANTHROPIC_MODEL ativo por vez.",
+    "x_ANTHROPIC_MODEL": "google/gemma-4-31b-it:free",
+    "x_ANTHROPIC_MODEL_2": "qwen/qwen3-coder:free",
+    "x_ANTHROPIC_MODEL_3": "meta-llama/llama-3.3-70b-instruct:free",
+    "x_ANTHROPIC_MODEL_4": "tencent/hy3:free",
+    "ANTHROPIC_MODEL": "google/gemma-4-26b-a4b-it:free"
+  },
+
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"\" == *.php ]]; then php -l \"\"; fi",
+            "description": "Valida sintaxe PHP somente em arquivos PHP.",
+            "onError": "abort"
+          }
+        ]
+      }
+    ]
+  }
+}
