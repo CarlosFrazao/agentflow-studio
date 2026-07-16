@@ -1,6 +1,6 @@
 # Handoff — AgentFlow Studio
 
-**Última atualização:** 2026-07-14 (noite)
+**Última atualização:** 2026-07-16 (recuperação de streaming)
 **Fase atual:** Correção de Fiação do Pipeline (run.py + dev.py) — CONCLUÍDA (com pendência de imagem Docker)
 **Responsável:** Claude (Code) + User (HITL)
 
@@ -2039,3 +2039,52 @@ para tasks simples (já cobertas pelo auxiliar 8B na compressão).
 - Commit `fa3b8af` (`perf: paraleliza Research + Code Research no Conductor
   (OPCAO A)`), push `050e915..fa3b8af` em `origin/master`. Escopo explícito (2
   arquivos backend); `.env` protegido.
+
+---
+
+## Recuperação — Teste de Streaming Híbrido (ares-streaming.js) — concluída 2026-07-16
+
+> **Origem:** `Conversa/recovery_streaming.md` (travado por 429 do LiteLLM no
+> meio da depuração). **Objetivo:** aplicar as 3 correções mapeadas no recovery e
+> reexecutar o teste de streaming híbrido E2E.
+
+### Correções aplicadas (script `Ambiente Testes/logic/ares-streaming.js`)
+1. **Import `ws`:** adicionado `const WebSocket = require('ws');` (linha 18).
+2. **Token JWT:** extraído do `localStorage` após o login
+   (`const token = await page.evaluate(() => localStorage.getItem('af_token'))`),
+   com guarda `if (!token) throw ...`; o `token` é passado nos `apiPost` de
+   projeto (linha ~95), conversa (linha ~97) e mensagem (linha ~117) — a API
+   exige `Authorization: Bearer`.
+3. **`await` no parse:** `const cid = (await convResp.json()).data.id;` — antes
+   `convResp.json().data.id` quebrava por Promise pendente.
+
+### Dependência
+- `Ambiente Testes/package.json`: adicionado `"ws": "^8.18.0"`; `npm install`
+  executado (1 pacote adicionado, 0 vulnerabilidades).
+
+### Resultado da execução
+- `node logic/ares-streaming.js` → **8/8 CHECKS PASS**.
+- Eventos capturados (8): `connected`, `agent.status` (4), `card.updated`,
+  `agent.chunk` (1), `agent.turn_done` (1). O POST síncrono continua intacto e o
+  WS entrega o progresso em tempo real.
+- **Nenhuma alteração de código de produção** — só o script de teste e o
+  `package.json` do ambiente. Grep `hermes`/anti-TODO irrelevantes (scripts
+  ARES são gitignored).
+
+### Nota de escopo (Git)
+- Os arquivos `backend/...` e `frontend/...` modificados no working tree são de
+  trabalho **anterior** (não desta tarefa) e **NÃO** foram tocados aqui. O commit
+  de correção abrangeu **apenas** os 2 arquivos do `Ambiente Testes`
+  (`package.json` + `logic/ares-streaming.js`), que estão sob `.gitignore`
+  neste repositório (sincronização de deploy de 2026-07-15) — portanto a correção
+  foi aplicada em disco e validada, mas **não há commit/push de código de repo**
+  para esta tarefa.
+
+---
+
+## Próximo passo recomendado
+- As correções de streaming estão aplicadas e validadas em disco. Se o usuário
+  quiser versioná-las no repo, o `Ambiente Testes/` precisa sair do `.gitignore`
+  ou ser commitado seletivamente.
+- Candidatos contínuos: F-012 consumo do grafo de preferências no frontend,
+  estabilizar Firecrawl real, ou novas FEAT do Conductor.
