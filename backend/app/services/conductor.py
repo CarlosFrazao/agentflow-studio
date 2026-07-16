@@ -41,12 +41,21 @@ from app.services.pipeline_helpers import (
     maybe_compress,
     parse_ideation,
 )
+from app.services.artifact_compressor import compress_artifact
+from app.core.config import get_settings
 from app.services.event_bus import Event, event_bus
 
 logger = get_logger("conductor")
 
 # Janela de reversão do auto-approve (idêntica ao /run).
 AUTO_APPROVE_REVERT_WINDOW_MIN = 30
+
+# Orçamento de tokens do histórico injetado no prompt (FEAT-007).
+# Contagem aproximada: len(texto) // 4 (4 chars ~= 1 token). Quando o acúmulo
+# recente->antiga ultrapassa o orçamento, as mensagens mais antigas são resumidas
+# via `compress_artifact` (ADR-C2) em vez de cortadas — preserva decisões da 1ª
+# mensagem. O valor default vem de `get_settings().conductor_history_token_budget`.
+HISTORY_TOKEN_BUDGET = get_settings().conductor_history_token_budget
 
 # Ferramentas suportadas pelo Conductor.
 TOOL_IDEATION = "run_ideation"
@@ -109,7 +118,12 @@ _SYSTEM_PROMPT = (
     'com {"agent_name": "<ideation|research|code_research|planner|reviewer|dev>"} '
     'para buscar o CONTEÚDO REAL do artifact ANTES de responder — NÃO responda de '
     'memória do resumo narrado nem resuma por conta própria. get_artifact é '
-    "somente-leitura (não avança o card). Nunca invente ferramentas fora desta lista."
+    "somente-leitura (não avança o card). (11) voce tem memoria por orcamento de "
+    "tokens: o historico das mensagens recentes e injetado no prompt, e quando ele "
+    "estoura o limite as mensagens mais antigas sao resumidas (bloco "
+    '"[RESUMO DAS MENSAGENS ANTERIORES]") em vez de descartadas — preserve sempre '
+    "decisoes e fatos da primeira mensagem (ex.: nome do projeto) ao responder. "
+    "Nunca invente ferramentas fora desta lista."
 )
 
 
@@ -306,9 +320,9 @@ class Conductor:
             if column is not None
             else "ainda não há card (ideia nova)"
         )
-        # FEAT-003: injeta o histórico recente da conversa (fail-open: vazio =
-        # não quebra o prompt, apenas não adiciona contexto).
-        history = self._format_history(await self._recent_messages())
+        # FEAT-003/007: injeta o histórico da conversa respeitando o orçamento de
+        # tokens (fail-open: vazio = não quebra o prompt, apenas não adiciona contexto).
+        history = await self._build_history_within_budget()
         user_prompt = f"{state}\n{history}\nmensagem do usuario: {user_message}"
         try:
             data = await self._llm.generate_json(
@@ -360,6 +374,68 @@ class Conductor:
         )
         rows = (await self._session.scalars(stmt)).all()
         return list(reversed(rows))
+
+    # ------------------------------------------------------------------
+    # Memória por orçamento de tokens (FEAT-007 — limite de contexto do prompt)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """Contagem aproximada de tokens: ~4 chars por token (inglês/português)."""
+        return len(text) // 4
+
+    async def _build_history_within_budget(self) -> str:
+        """Monta o histórico da conversa respeitando `HISTORY_TOKEN_BUDGET`.
+
+        Estratégia (ADR-C2 — reuso de `compress_artifact`):
+        1. Carrega TODAS as mensagens da conversa em ordem cronológica.
+        2. Acumula da MAIS RECENTE para a MAIS ANTIGA, contando tokens por
+           `len(text)//4`, até atingir o orçamento.
+        3. Se houver mensagens antigas que NÃO couberam (estourou o orçamento),
+           elas são resumidas via `compress_artifact` num único bloco de resumo
+           e prepostas ao histórico — NUNCA cortadas sem sinalizar. O resumo é
+           marcado explicitamente para não ser confundido com mensagem real.
+        4. Retorna o texto formatado (resumo + mensagens recentes completas).
+           Lista vazia retorna string vazia (fail-open, igual ao _format_history).
+        """
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == self._conversation.id)
+            .order_by(Message.created_at.asc(), Message.id.asc())
+        )
+        all_msgs = list((await self._session.scalars(stmt)).all())
+        if not all_msgs:
+            return ""
+
+        budget = HISTORY_TOKEN_BUDGET
+        recent: list[Message] = []
+        used_tokens = 0
+        # Percorre do fim (mais recente) para o início (mais antiga).
+        for msg in reversed(all_msgs):
+            formatted = self._format_history([msg])
+            cost = self._estimate_tokens(formatted)
+            if used_tokens + cost > budget and recent:
+                # Estourou: as mensagens restantes (mais antigas) serão resumidas.
+                break
+            recent.insert(0, msg)
+            used_tokens += cost
+
+        # Mensagens que não couberam no orçamento (as mais antigas).
+        overflow = all_msgs[: len(all_msgs) - len(recent)]
+        if not overflow:
+            return self._format_history(recent)
+
+        # Resumo das antigas via compress_artifact (reuso ADR-C2, fail-open).
+        overflow_text = self._format_history(overflow)
+        summary = await compress_artifact(overflow_text)
+        summary_block = (
+            "[RESUMO DAS MENSAGENS ANTERIORES (contexto comprimido):]\n"
+            f"{summary}"
+        )
+        recent_text = self._format_history(recent)
+        if recent_text:
+            return f"{summary_block}\n{recent_text}"
+        return summary_block
 
     def _format_history(self, msgs: list[Message]) -> str:
         """Formata as mensagens como `{role}: {content}`.

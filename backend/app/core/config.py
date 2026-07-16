@@ -97,6 +97,14 @@ class Settings(BaseSettings):
     # Orçamento-alvo do resumo em tokens (proporcional ao conteúdo, com teto).
     compression_budget_tokens: int = Field(default=800, gt=0)
 
+    # --- Memória de histórico do Conductor por orçamento de tokens (FEAT-007) ---
+    # Teto de tokens acumulados das mensagens recentes injetadas no prompt do LLM.
+    # Contagem aproximada: len(texto)//4 (4 chars ~= 1 token). Quando o acúmulo
+    # recente->antiga ultrapassa o orçamento, as mensagens mais antigas são
+    # resumidas via `compress_artifact` (ADR-C2) em vez de serem silenciosamente
+    # cortadas — assim o Conductor preserva decisões da 1ª mensagem.
+    conductor_history_token_budget: int = Field(default=3000, gt=0)
+
     # Sandbox de validação (Item E): docker | aws | modal
     sandbox_backend: str = "docker"
     aws_sandbox_function: str = "agentflow-sandbox"

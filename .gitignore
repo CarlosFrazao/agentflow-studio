@@ -56,6 +56,9 @@ frontend/*.mjs
 Ambiente\ Testes/logs/
 Ambiente\ Testes/screenshots/
 
+# Build artifact copiado para o contexto do Docker (não é código-fonte)
+backend/frontend_dist/
+
 # External read-only reference material (not part of the repo)
 Hermes/
 
