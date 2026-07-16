@@ -70,13 +70,15 @@ class Settings(BaseSettings):
     github_api_url: str = "https://api.github.com"
     github_call_timeout_s: float = 30.0
 
-    # LLM (Gemini 2.5 Pro) — execução dos agentes
+    # LLM (Gemini 2.5 Flash) — execução dos agentes (fallback secundário)
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-pro"
+    gemini_model: str = "gemini-2.5-flash"
 
     # LLM — provedores alternativos com fallback (sem chave = desativado)
+    # Ordem de prioridade (benchmark 2026-07-16): Groq primário, Gemini
+    # secundário, OpenRouter remoto por último (conta free pode estar limitada).
     openrouter_api_key: str | None = None
-    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
     ollama_base_url: str | None = None

@@ -244,29 +244,35 @@ class OllamaClient(LLMClient):
 # ---------------------------------------------------------------------------
 
 def build_llm_chain() -> list[LLMClient]:
-    """Constrói a cadeia de provedores na ordem de prioridade (settings)."""
+    """Constrói a cadeia de provedores na ordem de prioridade (settings).
+
+    Ordem (benchmark 2026-07-16): Groq (llama-3.1-8b-instant, 5/5 acertos,
+    ~1.3s) -> Gemini (gemini-2.5-flash, 4/5, ~7s) -> OpenRouter (conta free
+    atualmente limitada: 404/429, mantido por último como fallback remoto
+    caso a conta volte a ter crédito).
+    """
     settings = get_settings()
     chain: list[LLMClient] = []
 
-    # 1. OpenRouter
-    if settings.openrouter_api_key:
-        chain.append(OpenRouterClient(
-            api_key=settings.openrouter_api_key,
-            model=settings.openrouter_model,
-        ))
-
-    # 2. Groq
+    # 1. Groq (primário — free tier estável e rápido)
     if settings.groq_api_key:
         chain.append(GroqClient(
             api_key=settings.groq_api_key,
             model=settings.groq_model,
         ))
 
-    # 3. Gemini
+    # 2. Gemini (fallback secundário)
     if settings.gemini_api_key:
         chain.append(GeminiClient(
             api_key=settings.gemini_api_key,
             model=settings.gemini_model,
+        ))
+
+    # 3. OpenRouter (fallback remoto — conta free pode estar limitada)
+    if settings.openrouter_api_key:
+        chain.append(OpenRouterClient(
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model,
         ))
 
     # 4. Ollama (local) - tenta conectar; se falhar, ignora silenciosamente
