@@ -106,3 +106,93 @@ async def test_ideation_clear_when_no_open_questions() -> None:
     )
     result = await agent.run("ideia bem definida")
     assert result.needs_clarification is False
+
+
+async def test_ideation_preserves_valid_llm_name() -> None:
+    agent = _make_agent_with(
+        {
+            "project_name": "UniRide",
+            "key_features": ["a"],
+            "elevator_pitch": "p",
+            "confidence_score": 0.85,
+            "open_questions": [],
+        }
+    )
+    result = await agent.run("quero criar um app de caronas para a faculdade")
+    # A valid LLM-provided name must be kept as-is (no placeholder, no override).
+    assert result.project_name == "UniRide"
+    assert result.project_name != "Projeto sem nome"
+
+
+async def test_ideation_derives_name_when_llm_omits_it() -> None:
+    agent = _make_agent_with(
+        {
+            # Weak free-tier model omitted the name (or returned empty/whitespace).
+            "project_name": "",
+            "key_features": [],
+            "elevator_pitch": "",
+            "confidence_score": 0.0,
+            "open_questions": [],
+        }
+    )
+    result = await agent.run("quero criar um app de caronas para a faculdade")
+    # Must NOT surface the useless placeholder; derive a readable, grammatical name.
+    assert result.project_name != "Projeto sem nome"
+    assert result.project_name == "App de Caronas para a faculdade"
+
+
+async def test_ideation_derives_name_when_llm_returns_whitespace() -> None:
+    agent = _make_agent_with(
+        {
+            "project_name": "   ",
+            "key_features": [],
+            "elevator_pitch": "",
+            "confidence_score": 0.0,
+            "open_questions": [],
+        }
+    )
+    result = await agent.run("sistema de agendamento de salas")
+    assert result.project_name != "Projeto sem nome"
+    assert result.project_name == "App de Agendamento de salas"
+
+
+def test_derive_name_from_bare_noun_prefixes_app() -> None:
+    from app.services.agents.ideation import _derive_name
+
+    # Bare noun with no product word -> "App de <Noun>".
+    assert _derive_name("caronas") == "App de Caronas"
+
+
+def test_derive_name_strips_leading_intent_prefix() -> None:
+    from app.services.agents.ideation import _derive_name
+
+    # Preserves mid-sentence prepositions (grammar-friendly). A generic product
+    # noun in the original idea is re-introduced as "App de" regardless of the
+    # exact noun used ("app"/"site"/"sistema").
+    assert _derive_name("quero criar um app de caronas para a faculdade") == (
+        "App de Caronas para a faculdade"
+    )
+    assert _derive_name("fazer um site de vendas de cafes artesanais") == (
+        "App de Vendas de cafes artesanais"
+    )
+    # Bare intent verbs without a product noun keep the sentence as-is.
+    assert _derive_name("quero criar algo para organizar tarefas") == (
+        "Algo para organizar tarefas"
+    )
+
+
+def test_derive_name_preserves_grammar_without_prefix() -> None:
+    from app.services.agents.ideation import _derive_name
+
+    # No intent prefix -> sentence-case (first letter up), keep prepositions.
+    assert _derive_name("receitas com o que tem em casa") == (
+        "Receitas com o que tem em casa"
+    )
+
+
+def test_derive_name_empty_idea_is_neutral() -> None:
+    from app.services.agents.ideation import _derive_name
+
+    assert _derive_name("").strip() == "Novo Projeto"
+    assert _derive_name("   ").strip() == "Novo Projeto"
+
