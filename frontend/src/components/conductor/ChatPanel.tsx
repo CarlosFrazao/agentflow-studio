@@ -8,7 +8,7 @@ import {
 } from "../../api/conductor";
 import { ensureProject } from "../../api/client";
 import { apiGet, type Envelope } from "../../api/client";
-import { connectShareWs, type ShareWsHandle } from "../../api/shareWs";
+import { connectShareWs, type AgentEvent, type ShareWsHandle } from "../../api/shareWs";
 import { useBoardStore } from "../../store/useBoardStore";
 import type { Card } from "../../types/card";
 import type { Conversation, Message as ConvMessage } from "../../types/conductor";
@@ -38,6 +38,10 @@ export function ChatPanel() {
   const [awaitingUser, setAwaitingUser] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Streaming em tempo real (abordagem híbrida): status dos agentes + narrative
+  // acumulada em chunks via WebSocket, enquanto o POST síncrono processa.
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, "start" | "done">>({});
+  const [liveNarrative, setLiveNarrative] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const replaceCard = useBoardStore((s) => s.replaceCard);
   const setCards = useBoardStore((s) => s.setCards);
@@ -69,13 +73,29 @@ export function ChatPanel() {
 
   // Tempo real: abre a conexão WebSocket de compartilhamento para o projeto e
   // aplica as mudanças de card no store (o Kanban reflete o avanço disparado
-  // pelo Conductor sem refresh manual — Plano F-023 §5). O syncCard por polling
-  // permanece como fallback caso o WS caia.
+  // pelo Conductor sem refresh manual — Plano F-023 §5). Também consome os
+  // eventos agent.status/agent.chunk para exibir o progresso do turno em
+  // tempo real (abordagem híbrida: POST síncrono + streaming de status).
   useEffect(() => {
     if (!projectId) return;
-    const handle: ShareWsHandle = connectShareWs(projectId);
+    const handle: ShareWsHandle = connectShareWs(projectId, {
+      conversationId: conv?.id,
+      onAgentEvent: (e: AgentEvent) => {
+        if (e.type === "agent.status" && e.payload.agent) {
+          const agent = e.payload.agent;
+          const status = e.payload.status === "done" ? "done" : "start";
+          setAgentStatuses((prev) => ({ ...prev, [agent]: status }));
+        } else if (e.type === "agent.chunk" && e.payload.text) {
+          setLiveNarrative((prev) => prev + e.payload.text);
+        } else if (e.type === "agent.turn_done") {
+          // O POST já devolveu o estado final; limpa o streaming ao concluir.
+          setAgentStatuses({});
+          setLiveNarrative("");
+        }
+      },
+    });
     return () => handle.close();
-  }, [projectId]);
+  }, [projectId, conv?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -94,6 +114,8 @@ export function ChatPanel() {
     if (!conv || busy) return;
     setBusy(true);
     setError(null);
+    setAgentStatuses({});
+    setLiveNarrative("");
     const userMsg: ConvMessage = {
       id: `local-${Date.now()}`,
       conversation_id: conv.id,
@@ -173,8 +195,40 @@ export function ChatPanel() {
         ))}
         {busy && (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] text-[var(--muted)]">
-              Conductor está trabalhando…
+            <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px]">
+              <div className="mb-1.5 text-[12px] font-medium text-[var(--muted)]">
+                Conductor está trabalhando…
+              </div>
+              {Object.keys(agentStatuses).length > 0 && (
+                <ul className="mb-2 space-y-1">
+                  {Object.entries(agentStatuses).map(([agent, status]) => (
+                    <li
+                      key={agent}
+                      className="flex items-center gap-2 text-[12.5px]"
+                    >
+                      <span
+                        className={
+                          status === "done"
+                            ? "text-[var(--accent-text)]"
+                            : "text-[var(--muted)] animate-pulse"
+                        }
+                      >
+                        {status === "done" ? "✓" : "•"}
+                      </span>
+                      <span className="capitalize">{agent.replace(/_/g, " ")}</span>
+                      <span className="text-[11px] text-[var(--muted)]">
+                        {status === "done" ? "concluído" : "em andamento…"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {liveNarrative && (
+                <div className="whitespace-pre-wrap text-[13px] text-[var(--text-2)]">
+                  {liveNarrative}
+                  <span className="ml-0.5 inline-block animate-pulse">▍</span>
+                </div>
+              )}
             </div>
           </div>
         )}

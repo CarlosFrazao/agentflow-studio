@@ -45,6 +45,7 @@ from app.services.pipeline_helpers import (
 from app.services.artifact_compressor import compress_artifact
 from app.core.config import get_settings
 from app.services.event_bus import Event, event_bus
+from app.services.llm import stream_with_fallback
 
 logger = get_logger("conductor")
 
@@ -258,6 +259,8 @@ class Conductor:
         sequential = [n for n in tool_names if n not in parallel_set]
 
         if len(parallel_set) == 2:
+            self._publish_agent_event(TOOL_RESEARCH, "start", "Research Agent")
+            self._publish_agent_event(TOOL_CODE_RESEARCH, "start", "Code Research")
             parallel_results = await self._run_parallel(parallel_names, card)
             for result in parallel_results:
                 executed.append(result)
@@ -271,6 +274,8 @@ class Conductor:
                 )
                 if result.get("critical_alert"):
                     awaiting_user = True
+            self._publish_agent_event(TOOL_RESEARCH, "done", "Research Agent")
+            self._publish_agent_event(TOOL_CODE_RESEARCH, "done", "Code Research")
 
         tool_input_by_name = {tc.tool: tc.input for tc in plan.tool_calls}
 
@@ -278,6 +283,7 @@ class Conductor:
             if name == TOOL_ASK_USER:
                 awaiting_user = True
                 continue
+            self._publish_agent_event(name, "start", self._tool_summary({"tool": name}))
             result = await self._run_tool(name, card, tool_input_by_name.get(name, {}))
             executed.append(result)
             card = result.get("card") or card
@@ -289,6 +295,7 @@ class Conductor:
                 tool_input=result.get("input"),
                 tool_output=result.get("output"),
             )
+            self._publish_agent_event(name, "done", self._tool_summary({"tool": name}))
             # Se um Reviewer crítico for detectado, o Conductor para e pergunta.
             if result.get("critical_alert"):
                 awaiting_user = True
@@ -298,9 +305,25 @@ class Conductor:
                 awaiting_confirmation = True
 
         # 3) Narrativa: usa a do plano (LLM) ou gera a partir dos resultados.
+        # Abordagem híbrida: a narrative completa é publicada em CHUNKS via
+        # EventBus (WebSocket) enquanto o POST síncrono ainda processa — o
+        # frontend exibe o texto progressivamente. O POST continua devolvendo
+        # a narrative inteira no final (comportamento intacto).
         narrative = plan.narrative
         if not narrative:
             narrative = self._synthesize_narrative(executed, awaiting_user)
+
+        self._publish_agent_event("conductor", "start", "Conductor")
+        if plan.narrative:
+            # A narrative veio do LLM: publica em chunks (quebra por sentença)
+            # para progressão visual fiel ao streaming.
+            for chunk in _split_for_streaming(narrative):
+                self._publish_chunk(chunk)
+        else:
+            # Narrative sintetizada localmente: publica em um chunk.
+            self._publish_chunk(narrative)
+        self._publish_agent_event("conductor", "done", "Conductor")
+        self._publish_turn_done()
 
         # Persiste a resposta consolidada do Conductor.
         await self._save_message("conductor", content=narrative)
@@ -313,6 +336,63 @@ class Conductor:
             "awaiting_user": awaiting_user,
             "awaiting_confirmation": awaiting_confirmation,
         }
+
+    # ------------------------------------------------------------------
+    # Publicação de eventos de tempo real (abordagem híbrida: POST síncrono
+    # intacto + streaming de status/chunks via EventBus -> WebSocket).
+    # ------------------------------------------------------------------
+
+    def _publish_agent_event(self, agent: str, status: str, label: str | None = None) -> None:
+        """Publica mudança de status de um agente no EventBus (tempo real).
+
+        O frontend do chat consome via /share/{project_id}/ws e exibe o
+        progresso enquanto o POST síncrono ainda processa o turno. O nome do
+        agente é normalizado (sem prefixo ``run_``/``_tool``) para exibição e
+        matching estáveis no cliente.
+        """
+        clean = agent.replace("run_", "").replace("_tool", "").replace("confirm_ideation", "ideation")
+        project_id = str(getattr(self._conversation, "project_id", "") or "")
+        event_bus.publish(
+            Event(
+                type="agent.status",
+                payload={
+                    "conversation_id": str(self._conversation.id),
+                    "project_id": project_id,
+                    "agent": clean,
+                    "status": status,
+                    "label": label or clean,
+                },
+            )
+        )
+
+    def _publish_chunk(self, text: str) -> None:
+        """Publica um chunk de texto da narrative do Conductor (streaming)."""
+        if not text:
+            return
+        project_id = str(getattr(self._conversation, "project_id", "") or "")
+        event_bus.publish(
+            Event(
+                type="agent.chunk",
+                payload={
+                    "conversation_id": str(self._conversation.id),
+                    "project_id": project_id,
+                    "agent": "conductor",
+                    "text": text,
+                },
+            )
+        )
+
+    def _publish_turn_done(self) -> None:
+        project_id = str(getattr(self._conversation, "project_id", "") or "")
+        event_bus.publish(
+            Event(
+                type="agent.turn_done",
+                payload={
+                    "conversation_id": str(self._conversation.id),
+                    "project_id": project_id,
+                },
+            )
+        )
 
     def _tool_summary(self, result: dict[str, Any]) -> str:
         """Texto curto exibido na bolha de tool do chat (Plano F-023 §6)."""
@@ -1225,6 +1305,50 @@ class Conductor:
                     else "Código gerado (validação pendente)."
                 )
         return " ".join(parts) if parts else "Concluído."
+
+
+# ----------------------------------------------------------------------
+# Helpers de streaming (abordagem híbrida)
+# ----------------------------------------------------------------------
+
+def _split_for_streaming(text: str, *, max_chars: int = 40) -> list[str]:
+    """Quebra um texto em chunks para progressão visual no WebSocket.
+
+    Mantém a pontuação grudada ao final da frase (não corta no meio de uma
+    palavra quando possível) e respeita um tamanho máximo por chunk. O texto
+    completo é idêntico à concatenção dos chunks (o POST devolve tudo).
+    """
+    if not text:
+        return []
+    chunks: list[str] = []
+    # Quebra primária por sentença (ponto final/Interrogação/exclamação).
+    sentences = []
+    buf = ""
+    for ch in text:
+        buf += ch
+        if ch in ".!?":
+            sentences.append(buf)
+            buf = ""
+    if buf:
+        sentences.append(buf)
+    for sent in sentences:
+        sent = sent.strip()
+        if not sent:
+            continue
+        if len(sent) <= max_chars:
+            chunks.append(sent + " ")
+            continue
+        # Sentença longa: quebra por palavras respeitando max_chars.
+        words = sent.split()
+        cur = ""
+        for w in words:
+            if cur and len(cur) + len(w) + 1 > max_chars:
+                chunks.append(cur.strip() + " ")
+                cur = ""
+            cur = (cur + " " + w).strip() if cur else w
+        if cur:
+            chunks.append(cur.strip() + " ")
+    return chunks
 
 
 # ----------------------------------------------------------------------

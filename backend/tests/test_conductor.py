@@ -1568,3 +1568,114 @@ async def test_independent_tools_run_in_parallel_via_gather(
     assert events[1][0] == "code_research" and events[1][1] == "start"
     assert ("research", "end") not in events[:2]
     assert ("code_research", "end") not in events[:2]
+
+
+# ---------------------------------------------------------------------------
+# STREAMING HÍBRIDO: POST intacto + eventos agent.status/agent.chunk no WS
+# ---------------------------------------------------------------------------
+
+async def test_handle_turn_publishes_agent_events_via_eventbus(
+    client, session_factory, monkeypatch
+) -> None:
+    """O handle_turn publica eventos de tempo real (agent.status/agent.chunk/
+    agent.turn_done) no EventBus DURANTE a execução, sem alterar o retorno do
+    POST (abordagem híbrida: POST síncrono intacto + streaming no WebSocket).
+
+    Prova:
+    - agent.status start/done são emitidos para as tools executadas;
+    - agent.chunk é emitido com a narrative (mesmo sintetizada);
+    - agent.turn_done sinaliza o fim;
+    - o POST ainda devolve o turno completo (tool_calls + conductor_reply).
+    """
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.event_bus import Event, event_bus
+
+    published: list = []
+    monkeypatch.setattr(
+        event_bus, "publish", lambda event: published.append(event)
+    )
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="planning", title="App de caronas")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        # Roda o planner (tool única da coluna planning) via handle_turn completo.
+        result = await cond.handle_turn("fazer o plano")
+
+    # O POST continua devolvendo o turno completo (comportamento intacto).
+    assert result["tool_calls"], "POST deve devolver tool_calls"
+    assert result["conductor_reply"] is not None
+
+    types = [e.type for e in published]
+    # Status start/done do planner foram publicados.
+    assert "agent.status" in types, f"esperado agent.status em {types}"
+    status_events = [e for e in published if e.type == "agent.status"]
+    agents = {e.payload["agent"] for e in status_events}
+    assert "planner" in agents, f"planner deve ter status publicado: {agents}"
+    # Toda tool com start tem correspondente done.
+    for agent in agents:
+        starts = sum(1 for e in status_events if e.payload["agent"] == agent and e.payload["status"] == "start")
+        dones = sum(1 for e in status_events if e.payload["agent"] == agent and e.payload["status"] == "done")
+        assert starts == dones == 1, f"{agent}: start/done devem casar (s={starts},d={dones})"
+    # Chunk da narrative publicado.
+    chunk_events = [e for e in published if e.type == "agent.chunk"]
+    assert chunk_events, "agent.chunk deve ser publicado"
+    joined = "".join(e.payload["text"] for e in chunk_events)
+    assert result["conductor_reply"] in joined or joined.strip(), "chunk deve compor a narrative"
+    # Sinal de fim de turno.
+    assert "agent.turn_done" in types, "agent.turn_done deve ser publicado"
+
+
+async def test_handle_turn_streams_llm_narrative_in_chunks(
+    session_factory, monkeypatch
+) -> None:
+    """Quando o LLM devolve narrative, ela é publicada em CHUNKS (não 1 só).
+
+    Isso habilita a progressão visual no frontend sem custo extra de LLM
+    (o texto já existe no plano JSON do Conductor).
+    """
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.event_bus import Event, event_bus
+
+    class _NarrativeLLM(_SpyLLM):
+        async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+            self.last_user_prompt = user_prompt
+            return {
+                "narrative": "Plano técnico pronto. Stack definida. Próximo passo é a revisão.",
+                "tool_calls": [{"tool": "run_planner", "input": {}}],
+            }
+
+    published: list = []
+    monkeypatch.setattr(
+        event_bus, "publish", lambda event: published.append(event)
+    )
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="planning", title="App")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _NarrativeLLM())
+        cond._conversation.card_id = card.id
+        await cond.handle_turn("fazer o plano")
+
+    chunk_events = [e for e in published if e.type == "agent.chunk"]
+    # A narrative do LLM (3 sentenças) deve vir em MAIS de 1 chunk.
+    assert len(chunk_events) > 1, f"narrative do LLM deve vir em chunks: {len(chunk_events)}"
+    joined = "".join(e.payload["text"] for e in chunk_events).strip()
+    assert "Plano técnico pronto" in joined

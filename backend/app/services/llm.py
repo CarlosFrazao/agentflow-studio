@@ -13,6 +13,7 @@ Fallback acontece silenciosamente se falhar (rede, auth, rate-limit, etc.).
 from abc import ABC, abstractmethod
 import json
 import os
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
@@ -37,6 +38,17 @@ class LLMClient(ABC):
     @abstractmethod
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
         ...
+
+    async def stream_text(
+        self, *, system_prompt: str, user_prompt: str
+    ) -> AsyncGenerator[str, None]:
+        """Yield de chunks de texto (streaming).
+
+        Default: retorna o texto completo de uma vez (fallback para clients sem
+        streaming). Subclasses com SSE real sobrescrevem para emitir deltas.
+        Usado pelo Conductor para publicar chunks progressivos no WebSocket.
+        """
+        yield await self.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +160,65 @@ class GroqClient(LLMClient):
         )
         return data["choices"][0]["message"]["content"]
 
+    async def stream_text(
+        self, *, system_prompt: str, user_prompt: str
+    ) -> AsyncGenerator[str, None]:
+        """Streaming real via SSE (stream=true) da Groq/OpenAI compatível.
+
+        Emite cada delta de conteúdo conforme chega; em falha de parsing ou de
+        transporte, recai no generate_text completo (fail-open).
+        """
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.1,
+            "stream": True,
+        }
+
+        async def _iter_lines(resp):
+            async for line in resp.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                data_str = line[len("data:") :].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk["choices"][0]["delta"].get("content")
+                    if delta:
+                        yield delta
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    continue
+
+        try:
+            if self._http_client is not None:
+                async with self._http_client.stream(
+                    "POST", self._base, headers=headers, json=payload
+                ) as resp:
+                    resp.raise_for_status()
+                    async for delta in _iter_lines(resp):
+                        yield delta
+            else:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    async with client.stream(
+                        "POST", self._base, headers=headers, json=payload
+                    ) as resp:
+                        resp.raise_for_status()
+                        async for delta in _iter_lines(resp):
+                            yield delta
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("groq_stream_failed_fallback", error=str(exc))
+            yield await self.generate_text(
+                system_prompt=system_prompt, user_prompt=user_prompt
+            )
+
 
 class GeminiClient(LLMClient):
     """Wrapper do Google Gemini via o SDK `google.genai` (nova geração)."""
@@ -188,6 +259,27 @@ class GeminiClient(LLMClient):
             return response.text
         except Exception as exc:
             raise LLMError(f"Gemini falhou: {exc}") from exc
+
+    async def stream_text(
+        self, *, system_prompt: str, user_prompt: str
+    ) -> AsyncGenerator[str, None]:
+        """Streaming real do Gemini via generate_content(stream=True)."""
+        try:
+            client = self._get_client()
+            response = await client.aio.models.generate_content(
+                model=self._model_name,
+                contents=f"{system_prompt}\n\n{user_prompt}",
+                config={"temperature": 0.1},
+                stream=True,
+            )
+            async for chunk in response:
+                if getattr(chunk, "text", None):
+                    yield chunk.text
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("gemini_stream_failed_fallback", error=str(exc))
+            yield await self.generate_text(
+                system_prompt=system_prompt, user_prompt=user_prompt
+            )
 
 
 class OllamaClient(LLMClient):
@@ -237,6 +329,57 @@ class OllamaClient(LLMClient):
             ],
         )
         return data.get("message", {}).get("content", "")
+
+    async def stream_text(
+        self, *, system_prompt: str, user_prompt: str
+    ) -> AsyncGenerator[str, None]:
+        """Streaming real do Ollama (stream=true retorna NDJSON de deltas)."""
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": True,
+            "options": {"temperature": 0.1},
+        }
+        try:
+            if self._http_client is not None:
+                resp = await self._http_client.post(
+                    f"{self._base}/api/chat", json=payload
+                )
+                resp.raise_for_status()
+                for line in resp.text.splitlines():
+                    if not line:
+                        continue
+                    try:
+                        piece = json.loads(line)
+                        delta = piece.get("message", {}).get("content", "")
+                        if delta:
+                            yield delta
+                    except json.JSONDecodeError:
+                        continue
+            else:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    resp = await client.post(
+                        f"{self._base}/api/chat", json=payload
+                    )
+                    resp.raise_for_status()
+                    for line in resp.text.splitlines():
+                        if not line:
+                            continue
+                        try:
+                            piece = json.loads(line)
+                            delta = piece.get("message", {}).get("content", "")
+                            if delta:
+                                yield delta
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ollama_stream_failed_fallback", error=str(exc))
+            yield await self.generate_text(
+                system_prompt=system_prompt, user_prompt=user_prompt
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -392,3 +535,37 @@ async def call_with_fallback(
             continue
 
     raise LLMError(f"Todos os provedores LLM falharam. Último erro: {last_exc}")
+
+
+async def stream_with_fallback(
+    system_prompt: str,
+    user_prompt: str,
+) -> AsyncGenerator[str, None]:
+    """Streaming com fallback: tenta a cadeia e faz yield do primeiro que funciona.
+
+    Se o provedor primário falhar no streaming, recai no texto completo e segue
+    pelos próximos da cadeia. Garante que sempre haja ao menos um chunk.
+    """
+    chain = build_llm_chain()
+    if not chain:
+        raise LLMError("Nenhum provedor LLM configurado.")
+
+    last_exc: Exception | None = None
+    for idx, client in enumerate(chain):
+        try:
+            async for delta in client.stream_text(
+                system_prompt=system_prompt, user_prompt=user_prompt
+            ):
+                yield delta
+            return
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            logger.warning(
+                "llm_stream_provider_failed",
+                provider=type(client).__name__,
+                attempt=idx + 1,
+                error=str(exc),
+            )
+            continue
+
+    raise LLMError(f"Todos os provedores LLM falharam no streaming. Último erro: {last_exc}")

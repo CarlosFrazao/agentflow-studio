@@ -20,17 +20,39 @@ export interface ShareWsHandle {
   close: () => void;
 }
 
+/** Evento de tempo real de um agente (status/chunk) enviado pelo backend. */
+export interface AgentEvent {
+  type: "agent.status" | "agent.chunk" | "agent.turn_done";
+  payload: {
+    conversation_id?: string;
+    project_id?: string;
+    agent: string;
+    status?: "start" | "done";
+    label?: string;
+    text?: string;
+  };
+}
+
 /**
  * Abre a conexão de tempo real para um projeto.
  * @param projectId id do projeto a acompanhar
- * @param onStatus callback opcional de status da conexão (para UI/telemetria)
+ * @param options.conversationId filtra eventos de agente por conversa (chat)
+ * @param options.onStatus callback opcional de status da conexão
+ * @param options.onAgentEvent callback para eventos agent.status/agent.chunk
+ *   (abordagem híbrida: POST síncrono intacto + streaming de progresso no WS)
  * @returns handle com close() para limpar no unmount
  */
 export function connectShareWs(
   projectId: string,
-  onStatus?: (status: "connecting" | "open" | "closed") => void,
+  options: {
+    conversationId?: string;
+    onStatus?: (status: "connecting" | "open" | "closed") => void;
+    onAgentEvent?: (e: AgentEvent) => void;
+  } = {},
 ): ShareWsHandle {
-  const url = `${wsBaseFromApi()}/share/${projectId}/ws`;
+  const { conversationId, onStatus, onAgentEvent } = options;
+  const qs = conversationId ? `?conversation_id=${encodeURIComponent(conversationId)}` : "";
+  const url = `${wsBaseFromApi()}/share/${projectId}/ws${qs}`;
   let socket: WebSocket | null = null;
   let closed = false;
 
@@ -48,6 +70,14 @@ export function connectShareWs(
           type: string;
           payload?: Record<string, unknown>;
         };
+        if (
+          msg.type === "agent.status" ||
+          msg.type === "agent.chunk" ||
+          msg.type === "agent.turn_done"
+        ) {
+          onAgentEvent?.(msg as AgentEvent);
+          return;
+        }
         if (msg.type !== "card.updated" || !msg.payload) return;
         const p = msg.payload;
         const card = payloadToCard(p);

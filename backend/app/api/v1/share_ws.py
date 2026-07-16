@@ -13,7 +13,9 @@ router = APIRouter(prefix="/share", tags=["share-ws"])
 
 
 @router.websocket("/{project_id}/ws")
-async def share_ws(websocket: WebSocket, project_id: str) -> None:
+async def share_ws(
+    websocket: WebSocket, project_id: str, conversation_id: str | None = None
+) -> None:
     await websocket.accept()
     queue = event_bus.subscribe()
     try:
@@ -21,12 +23,19 @@ async def share_ws(websocket: WebSocket, project_id: str) -> None:
         await websocket.send_json({"type": "connected", "project_id": project_id})
         while True:
             event: Event = await queue.get()
+            payload = event.payload
             # Filtra por projeto quando o evento traz project_id no payload
-            payload_project = event.payload.get("project_id")
+            payload_project = payload.get("project_id")
             if payload_project is not None and payload_project != project_id:
                 continue
+            # Filtro opcional por conversa (chat em tempo real): se o cliente
+            # pediu ?conversation_id=X, só entrega eventos dessa conversa.
+            if conversation_id is not None:
+                payload_conv = payload.get("conversation_id")
+                if payload_conv is not None and payload_conv != conversation_id:
+                    continue
             await websocket.send_json(
-                {"type": event.type, "payload": event.payload}
+                {"type": event.type, "payload": payload}
             )
     except WebSocketDisconnect:
         pass
