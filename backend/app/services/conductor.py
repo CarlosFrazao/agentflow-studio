@@ -244,14 +244,21 @@ class Conductor:
         executed: list[dict[str, Any]] = []
         awaiting_user = False
         awaiting_confirmation = False
-        # Research + Code Research rodam EM PARALELO (asyncio.gather) — prova de
-        # paralelismo real: seus started_at ficam sobrepostos (Plano F-023 §3.2).
+
+        # OPÇÃO A — paralelismo de etapas do pipeline: Research + Code Research
+        # rodam EM PARALELO via asyncio.gather (prova de paralelismo real: seus
+        # started_at ficam sobrepostos). São as únicas etapas independentes no
+        # fluxo (Code Research é artifact AUXILIAR, não avança coluna). O avanço
+        # de coluna é aplicado em sequência APÓS o gather, para não conflitar a
+        # transação da AsyncSession (dois commits concorrentes quebram o flush).
+        # Tools de leitura (get_card_state/get_artifact/answer_question) são
+        # instantâneas (sem LLM) e ficam na sequência para não duplicar lógica.
         parallel_names = [TOOL_RESEARCH, TOOL_CODE_RESEARCH]
         parallel_set = {n for n in tool_names if n in parallel_names}
-        sequential = [n for n in tool_names if n not in parallel_names]
+        sequential = [n for n in tool_names if n not in parallel_set]
 
         if len(parallel_set) == 2:
-            parallel_results = await self._run_parallel(parallel_set, card)
+            parallel_results = await self._run_parallel(parallel_names, card)
             for result in parallel_results:
                 executed.append(result)
                 card = result.get("card") or card
@@ -536,29 +543,49 @@ class Conductor:
         return {"tool": name, "input": {}, "output": {}, "card": card}
 
     async def _run_parallel(
-        self, names: set[str], card: Card | None
+        self, names: list[str], card: Card | None
     ) -> list[dict[str, Any]]:
-        """Executa Research + Code Research em paralelo via asyncio.gather.
+        """Executa tools INDEPENDENTES em paralelo via asyncio.gather (OPÇÃO A).
 
-        Os AGENTES rodam concorrentemente (prova de paralelismo real: ambos
-        iniciam quase juntos). A PERSISTÊNCIA/avanço do card é aplicada em
-        sequência APÓS o gather, para não conflitar a transação da sessão
-        (dois commits concorrentes na mesma AsyncSession quebram o flush). O
-        `code_research` é artifact AUXILIAR (como no /run): só o `research`
-        avança a coluna do card.
+        `names` são tools que não avançam a coluna entre si nem mutam estado
+        dependente (ex.: research + code_research + get_card_state). Os AGENTES
+        rodam concorrentemente (prova de paralelismo real: iniciam quase juntos).
+        A PERSISTÊNCIA/avanço do card é aplicada em sequência APÓS o gather, para
+        não conflitar a transação da AsyncSession (dois commits concorrentes na
+        mesma sessão quebram o flush). A ordem de exibição no chat segue `names`.
         """
         import asyncio
 
-        # 1) Execução concorrente dos agents (sem tocar a sessão).
-        outs = await asyncio.gather(
-            self._exec_research(card),
-            self._exec_code_research(card),
-        )
-        # 2) Aplicação serial (persistência + avanço de coluna).
-        r_research = await self._apply_research(card, outs[0])
-        r_code = await self._apply_code_research(card, outs[1])
-        # Ordem estável para exibição no chat: research antes de code_research.
-        return [r_research, r_code]
+        # 1) Execução concorrente (sem tocar a sessão). Cada coroutine chama o
+        #    executor fino correspondente; falhas são isoladas por gather.
+        async def _exec_one(name: str):
+            if name == TOOL_RESEARCH:
+                return await self._exec_research(card)
+            if name == TOOL_CODE_RESEARCH:
+                return await self._exec_code_research(card)
+            # Tools de leitura/resposta não têm executor assíncrono dedicado:
+            # rodam via _run_tool (get_card_state/get_artifact/answer_question).
+            return await self._run_tool(name, card, {})
+
+        raw = await asyncio.gather(*[_exec_one(n) for n in names], return_exceptions=True)
+
+        # 2) Aplicação serial (persistência + avanço de coluna), na ordem de `names`.
+        results: list[dict[str, Any]] = []
+        for name, out in zip(names, raw):
+            if isinstance(out, Exception):
+                logger.warning("parallel_tool_failed", tool=name, error=str(out))
+                results.append({"tool": name, "input": {}, "output": {"error": str(out)}, "card": card})
+                continue
+            if name == TOOL_RESEARCH:
+                results.append(await self._apply_research(card, out))
+            elif name == TOOL_CODE_RESEARCH:
+                results.append(await self._apply_code_research(card, out))
+            else:
+                # get_card_state / get_artifact / answer_question: o próprio
+                # _run_tool já persiste a mensagem de tool mais abaixo; aqui só
+                # registramos o resultado para exibição consistente.
+                results.append(out if isinstance(out, dict) else {"tool": name, "card": card})
+        return results
 
     async def _tool_ideation(self) -> dict[str, Any]:
         """Cria o Card real em backlog, roda o Ideation e avança para researching."""

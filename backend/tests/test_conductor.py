@@ -1512,3 +1512,59 @@ async def test_revert_approval_publishes_card_updated(
     updated = [e for e in published if e.type == "card.updated"]
     assert updated, "revert_approval deve publicar card.updated"
     assert updated[-1].payload["column"] == "production"
+
+
+# ---------------------------------------------------------------------------
+# OPÇÃO A: paralelismo generalizado de tools independentes num turno
+# ---------------------------------------------------------------------------
+
+async def test_independent_tools_run_in_parallel_via_gather(
+    client, session_factory, monkeypatch
+) -> None:
+    """Tools independentes (research + code_research + get_card_state) de um
+    mesmo turno rodam concurrentemente via asyncio.gather.
+
+    Prova de paralelismo real: todos iniciam antes de qualquer um terminar.
+    O avanço de coluna (só research avança) é aplicado em sequência APÓS o
+    gather, preservando a ordem do Kanban e a transação da sessão.
+    """
+    from app.services.agents.research import ResearchAgent, ResearchOutput
+    from app.services.agents.code_research import (
+        CodeResearchAgent,
+        CodeResearchOutput,
+    )
+
+    events: list[tuple[str, str]] = []
+
+    async def fake_research(self, query, mode="guerrilha"):  # noqa: ANN001
+        events.append(("research", "start"))
+        await asyncio.sleep(0.02)
+        events.append(("research", "end"))
+        return ResearchOutput(sra_report="# r", confidence=0.9)
+
+    async def fake_code_research(self, **kwargs):  # noqa: ANN001
+        events.append(("code_research", "start"))
+        await asyncio.sleep(0.02)
+        events.append(("code_research", "end"))
+        return CodeResearchOutput(suggestions=["a"], license_class="permissive")
+
+    monkeypatch.setattr(ResearchAgent, "run", fake_research)
+    monkeypatch.setattr(CodeResearchAgent, "run", fake_code_research)
+
+    _override_services(client, _FakeLLM())
+    pid = await _seed_project(client)
+    cid = await _create_conversation(client, pid)
+    await _turn(client, cid, "quero criar um app de caronas pra faculdade")
+    await _turn(client, cid, "confirmar e prosseguir")
+    # T2: dispara research + code_research juntos (researching -> planning).
+    body = await _turn(client, cid, "seguir com a pesquisa")
+
+    assert body["awaiting_user"] is False
+    card = await client.get("/api/v1/cards/" + body["card_id"])
+    assert card.json()["data"]["column"] == "planning"
+
+    # Prova de paralelismo: ambos iniciaram ANTES de qualquer um terminar.
+    assert events[0][0] == "research" and events[0][1] == "start"
+    assert events[1][0] == "code_research" and events[1][1] == "start"
+    assert ("research", "end") not in events[:2]
+    assert ("code_research", "end") not in events[:2]
