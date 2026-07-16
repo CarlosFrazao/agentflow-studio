@@ -736,3 +736,26 @@ erros críticos**. Commit `dd7f1de` → `origin/master`.
 **Resultado:** cadeia LLM agora roda no modelo free de MAIOR qualidade (70B,
 5.0/5.0). Resposta à pergunta do usuário: sim, a IA agora entrega trabalho de
 qualidade alta, não básica.
+
+---
+
+## 2026-07-16 (noite, 4ª rodada) — OPÇÃO A: paralelismo de etapas
+
+**Solicitação:** "faz a opção A, paraleliza as etapas do pipeline."
+
+**Contexto honesto:** o pipeline é sequencial por dependência de dados
+(Planner←Research, Dev←Planner...), o que está correto. O único par
+independente é Research + Code Research (que já rodava em gather, mas com
+executor fixo). Generalizei `_run_parallel` para receber lista de tools e
+executar via `asyncio.gather`, aplicando avanço de coluna em sequência após o
+gather (evita conflito de transação na AsyncSession). Adicionei teste que prova
+sobreposição real de start/end.
+
+**Testes:** suíte completa **339 passed, 0 failed**. ARES complexo reexecutado
+com 70B + paralelismo → **13/13 PASS, 0 erros críticos**. Commit `fa3b8af` →
+`origin/master`.
+
+**Limite honesto:** o ganho é o overlap Research+Code Research (~1 chamada de
+latência economizada por turno de pesquisa). A latência de CADA chamada do 70B
+não muda — paralelismo não resolve latência individual. Próxima alavanca seria
+streaming de resposta ou modelo menor pra tasks simples.

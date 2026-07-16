@@ -1993,3 +1993,49 @@ perfeitos. O 70B é ~5x mais lento que o 8B mas **free** e qualidade máxima.
 2. Gemini `gemini-2.5-flash` — fallback secundário (qualidade máx., lento)
 3. Groq `llama-3.1-8b-instant` — só compressão de artefatos (auxiliar)
 4. OpenRouter free — último fallback (indisponível: 404/429)
+
+---
+
+## OPÇÃO A — Paralelismo de etapas do pipeline no Conductor (2026-07-16)
+
+> **Solicitação do usuário:** "faz a opção A, paraleliza as etapas do pipeline"
+> para aumentar a velocidade percebida das tarefas.
+
+### Contexto arquitetural (honestidade)
+- O pipeline é **estritamente sequencial por dependência de dados**: cada etapa
+  consome o artifact da anterior (Planner←Research, Dev←Planner, etc.). Isso
+  está **correto** e NÃO foi quebrado.
+- O único par de etapas **independentes** no fluxo é Research + Code Research
+  (Code Research é artifact AUXILIAR, não avança coluna). Esse par JÁ rodava em
+  `asyncio.gather`, mas o executor era fixo (só aquele par).
+
+### O que foi feito (mudança cirúrgica)
+- `app/services/conductor.py` → `_run_parallel(names: list[str], card)`
+  generalizado: recebe lista de tools independentes, executa via
+  `asyncio.gather(*[_exec_one(n) ...])` (concorrência real), e aplica
+  persistência/avanço de coluna em **sequência APÓS o gather** (evita conflito
+  de transação na mesma AsyncSession — dois commits concorrentes quebram o
+  flush). Falhas isoladas por `return_exceptions=True`.
+- `handle_turn`: particiona `tool_names` em paralelo (Research+Code Research) e
+  sequencial (o resto). Tools de leitura (get_card_state/get_artifact/
+  answer_question) ficam na sequência por serem instantâneas (sem LLM).
+- `tests/test_conductor.py` → novo teste `test_independent_tools_run_in_
+  parallel_via_gather` prova sobreposição real (ambos iniciam antes de qualquer
+  um terminar) e que o card avança researching→planning corretamente.
+
+### Testes
+- Suíte completa: **339 passed, 0 failed** (3 warnings inofensivos).
+- **ARES complexo: 13/13 PASS, 0 erros críticos** (valida ponta a ponta após
+  rebuild do backend com o 70B).
+
+### Limite honesto da OPÇÃO A
+O ganho real é o overlap de Research + Code Research (economiza ~1 chamada de
+LLM de latência por turno de pesquisa). A latência de CADA chamada individual
+do 70B não muda — paralelizar não resolve latência de 1 chamada. Para cortar
+tempo percebido além disso, seria preciso streaming de resposta ou modelo menor
+para tasks simples (já cobertas pelo auxiliar 8B na compressão).
+
+### Git
+- Commit `fa3b8af` (`perf: paraleliza Research + Code Research no Conductor
+  (OPCAO A)`), push `050e915..fa3b8af` em `origin/master`. Escopo explícito (2
+  arquivos backend); `.env` protegido.
