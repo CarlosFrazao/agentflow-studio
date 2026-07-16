@@ -214,9 +214,9 @@ async def test_build_llm_chain_uses_settings(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ollama_base_url", "http://localhost:11434")
     chain = build_llm_chain()
     assert len(chain) == 4
-    assert isinstance(chain[0], OpenRouterClient)
-    assert isinstance(chain[1], GroqClient)
-    assert isinstance(chain[2], GeminiClient)
+    assert isinstance(chain[0], GroqClient)
+    assert isinstance(chain[1], GeminiClient)
+    assert isinstance(chain[2], OpenRouterClient)
     assert isinstance(chain[3], OllamaClient)
 
 
