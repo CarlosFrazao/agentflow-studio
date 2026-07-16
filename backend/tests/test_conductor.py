@@ -1373,3 +1373,142 @@ async def test_early_fact_survives_summary(session_factory, monkeypatch) -> None
         assert spy.last_user_prompt is not None
         # O nome do projeto da 1ª mensagem chega ao LLM (via resumo ou mensagem recente).
         assert project_name in spy.last_user_prompt
+
+
+# ---------------------------------------------------------------------------
+# FEAT-009: revert_approval — desfazer auto-approve recente via chat (C-4)
+# ---------------------------------------------------------------------------
+
+
+async def test_revert_approval_within_window_reverts_card(session_factory) -> None:
+    """Dentro da janela, revert_approval volta a coluna e limpa auto-approve."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import TOOL_REVERT_APPROVAL
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(
+            project_id=proj.id,
+            column="done",
+            title="App",
+            auto_approved=True,
+            approval_by="auto",
+            revert_deadline=datetime.now(tz=timezone.utc) + timedelta(minutes=10),
+        )
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+
+        result = await cond._run_tool(TOOL_REVERT_APPROVAL, card, {})
+        assert result["output"].get("reverted") is True
+        await s.refresh(card)
+        assert card.column == "production"
+        assert card.auto_approved is False
+        assert card.approval_by == "none"
+        assert card.revert_deadline is None
+
+
+async def test_revert_approval_outside_window_returns_clear_message(
+    session_factory,
+) -> None:
+    """Fora da janela, revert_approval não altera o card e explica o motivo."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import TOOL_REVERT_APPROVAL
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(
+            project_id=proj.id,
+            column="done",
+            title="App",
+            auto_approved=True,
+            approval_by="auto",
+            revert_deadline=datetime.now(tz=timezone.utc) - timedelta(minutes=1),
+        )
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+
+        result = await cond._run_tool(TOOL_REVERT_APPROVAL, card, {})
+        assert result["output"].get("reverted") is False
+        assert "30 minutos" in result["output"].get("error", "")
+        await s.refresh(card)
+        # Estado preservado.
+        assert card.column == "done"
+        assert card.auto_approved is True
+
+
+async def test_revert_approval_no_card_fails_open(session_factory) -> None:
+    """Sem card, revert_approval devolve erro claro (fail-open, não exceção)."""
+    from app.models.project import Project
+    from app.services.conductor import TOOL_REVERT_APPROVAL
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        result = await cond._run_tool(TOOL_REVERT_APPROVAL, None, {})
+        assert result["output"].get("error") == "no_card"
+
+
+async def test_revert_approval_publishes_card_updated(
+    session_factory, monkeypatch
+) -> None:
+    """A reversão bem-sucedida publica card.updated (Kanban em tempo real)."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import TOOL_REVERT_APPROVAL
+    from app.services.event_bus import Event, event_bus
+
+    published: list = []
+    monkeypatch.setattr(
+        event_bus, "publish", lambda event: published.append(event)
+    )
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(
+            project_id=proj.id,
+            column="done",
+            title="App",
+            auto_approved=True,
+            approval_by="auto",
+            revert_deadline=datetime.now(tz=timezone.utc) + timedelta(minutes=10),
+        )
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        await cond._run_tool(TOOL_REVERT_APPROVAL, card, {})
+
+    updated = [e for e in published if e.type == "card.updated"]
+    assert updated, "revert_approval deve publicar card.updated"
+    assert updated[-1].payload["column"] == "production"

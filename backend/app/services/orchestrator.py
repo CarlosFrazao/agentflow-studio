@@ -9,6 +9,7 @@ A execução de I/O (LLM, MCP) fica nos agents/services; este módulo é puro.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from app.models.card import KANBAN_COLUMNS
@@ -52,6 +53,56 @@ def next_column(column: str) -> str:
     if idx >= len(PIPELINE_ORDER) - 1:
         return "done"
     return PIPELINE_ORDER[idx + 1]
+
+
+def prev_column(column: str) -> str:
+    """Coluna imediatamente anterior no fluxo linear (inverso de next_column).
+
+    A primeira coluna ('backlog') não tem antecessora: retorna a si mesma
+    (evita sair do pipeline ao reverter um card já no início).
+    """
+    if column not in PIPELINE_ORDER:
+        raise ValueError(f"coluna invalida: {column}")
+    idx = PIPELINE_ORDER.index(column)
+    if idx <= 0:
+        return PIPELINE_ORDER[0]
+    return PIPELINE_ORDER[idx - 1]
+
+
+def revert_auto_approval(card: Any) -> bool:
+    """Desfaz um auto-approve recente, dentro da janela de reversão (FEAT-009).
+
+    Módulo puro (sem I/O): o chamador é responsável por persistir e publicar
+    o evento de atualização. Regras (achado R4 — undo não existia):
+
+    - Se o card não foi auto-aprovado (``auto_approved`` falso) ou a janela já
+      expirou (``revert_deadline`` ausente ou no passado), retorna ``False`` e
+      não altera o card.
+    - Caso contrário, volta o card para a coluna anterior (``prev_column``),
+      limpa as flags de aprovação (``auto_approved=False``, ``approval_by="none"``,
+      ``revert_deadline=None``) e retorna ``True``.
+    """
+    if not getattr(card, "auto_approved", False):
+        return False
+    deadline = getattr(card, "revert_deadline", None)
+    if deadline is None:
+        return False
+    # SQLite não preserva o tzinfo na leitura: normaliza deadlines naive para
+    # UTC (o /run e o Conductor sempre gravam em UTC) antes de comparar.
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    if datetime.now(tz=timezone.utc) >= deadline:
+        return False
+    card.column = prev_column(card.column)
+    card.auto_approved = False
+    card.approval_by = "none"
+    card.revert_deadline = None
+    logger.info(
+        "auto-approve revertido: card_id=%s -> coluna=%s",
+        getattr(card, "id", None),
+        card.column,
+    )
+    return True
 
 
 def should_auto_approve(confidence_score: float, critical_alerts: int) -> bool:

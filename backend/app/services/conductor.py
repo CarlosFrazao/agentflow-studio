@@ -33,6 +33,7 @@ from app.services.orchestrator import (
     AUTO_APPROVE_CONFIDENCE_THRESHOLD,
     column_after_review,
     next_column,
+    revert_auto_approval,
     should_auto_approve,
 )
 from app.services.pipeline_helpers import (
@@ -70,12 +71,19 @@ TOOL_CONFIRM_IDEATION = "confirm_ideation"
 TOOL_ANSWER = "answer_question"
 TOOL_GET_ARTIFACT = "get_artifact"
 TOOL_REVISE_ARTIFACT = "revise_artifact"
+TOOL_REVERT_APPROVAL = "revert_approval"
 
 # Etapas cujo conteúdo COMPLETO pode ser consultado via get_artifact.
 # Whitelist defensiva: impede injection de agent_name arbitrário.
 GET_ARTIFACT_WHITELIST: frozenset[str] = frozenset(
     {"ideation", "research", "code_research", "planner", "reviewer", "dev"}
 )
+
+# Ferramentas destrutivas de intenção EXPLÍCITA: só rodam quando o LLM as
+# seleciona de propósito (pedido do usuário), NUNCA no plano determinístico de
+# fail-open — reverter uma aprovação sozinho no autopilot seria um efeito
+# colateral inaceitável (FEAT-009 / R4).
+EXPLICIT_INTENT_TOOLS: frozenset[str] = frozenset({TOOL_REVERT_APPROVAL})
 
 # revise_artifact só aceita re-executar o Planner ou o Dev (FEAT-008).
 # Whitelist restritiva: impede re-executar etapas a montante (Research/Code
@@ -96,6 +104,7 @@ GLOBAL_TOOLS: list[str] = [
     TOOL_GET_ARTIFACT,
     TOOL_ANSWER,
     TOOL_REVISE_ARTIFACT,
+    TOOL_REVERT_APPROVAL,
 ]
 
 # Mapeia a coluna atual do card para o conjunto determinístico de ferramentas.
@@ -147,6 +156,11 @@ _SYSTEM_PROMPT = (
     "etapa indicada (sem re-rodar Research/Code Research a montante) e cria uma "
     "NOVA versao do artifact, mantendo o card na MESMA coluna. Nunca use "
     "revise_artifact para perguntas; para isso use get_artifact/answer_question. "
+    "(13) se o usuario pedir para DESFAZER/reverter uma aprovacao automatica "
+    'recente (ex: "desfaz isso", "reverte a aprovacao", "volta o card"), use '
+    '"revert_approval" com "input":{} — isso volta o card para a coluna anterior '
+    "e limpa o auto-approve, desde que ainda esteja dentro da janela de 30 "
+    "minutos. Fora da janela, a ferramenta explica que o prazo expirou. "
     "Nunca invente ferramentas fora desta lista."
 )
 
@@ -163,7 +177,10 @@ def _default_plan_for_column(column: str | None, has_card: bool = False) -> list
         return [TOOL_IDEATION]
     if column == "backlog" and has_card:
         return [TOOL_CONFIRM_IDEATION]
-    return COLUMN_TO_TOOLS.get(column, [TOOL_GET_CARD_STATE])
+    tools = COLUMN_TO_TOOLS.get(column, [TOOL_GET_CARD_STATE])
+    # Ferramentas de intenção explícita (ex.: revert_approval) nunca entram no
+    # plano determinístico: só rodam quando o LLM as escolhe deliberadamente.
+    return [t for t in tools if t not in EXPLICIT_INTENT_TOOLS]
 
 
 class Conductor:
@@ -512,6 +529,8 @@ class Conductor:
             return await self._tool_get_artifact(card, user_input or {})
         if name == TOOL_REVISE_ARTIFACT:
             return await self._tool_revise_artifact(card, user_input or {})
+        if name == TOOL_REVERT_APPROVAL:
+            return await self._tool_revert_approval(card)
         if name == TOOL_ANSWER:
             return self._tool_answer_question(card)
         return {"tool": name, "input": {}, "output": {}, "card": card}
@@ -896,6 +915,47 @@ class Conductor:
     def _no_card(self, tool: str) -> dict[str, Any]:
         logger.warning("conductor_tool_without_card", tool=tool)
         return {"tool": tool, "input": {}, "output": {"error": "no_card"}, "card": None}
+
+    async def _tool_revert_approval(self, card: Card | None) -> dict[str, Any]:
+        """Desfaz um auto-approve recente dentro da janela de 30min (FEAT-009, C-4).
+
+        Tool GLOBAL: chama o helper puro ``revert_auto_approval`` do orchestrator.
+        Se a reversão for aplicada (dentro da janela), persiste o card, publica
+        ``card.updated`` (Kanban em tempo real) e narra o desfazer. Se a janela
+        já expirou (ou o card não foi auto-aprovado), devolve erro claro — nunca
+        exceção.
+        """
+        if card is None:
+            return self._no_card(TOOL_REVERT_APPROVAL)
+
+        reverted = revert_auto_approval(card)
+        if not reverted:
+            return {
+                "tool": TOOL_REVERT_APPROVAL,
+                "input": {},
+                "output": {
+                    "reverted": False,
+                    "error": (
+                        "a janela de 30 minutos para desfazer a aprovação "
+                        "automática expirou (ou o card não foi auto-aprovado)"
+                    ),
+                },
+                "card": card,
+            }
+
+        await self._session.commit()
+        await self._session.refresh(card)
+        self._publish_card_updated(card)
+        return {
+            "tool": TOOL_REVERT_APPROVAL,
+            "input": {},
+            "output": {"reverted": True, "column": card.column},
+            "narrative": (
+                f"Aprovação automática desfeita. O card voltou para "
+                f"'{card.column}'."
+            ),
+            "card": card,
+        }
 
     async def _tool_revise_artifact(
         self, card: Card | None, user_input: dict

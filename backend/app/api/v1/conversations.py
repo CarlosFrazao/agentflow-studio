@@ -58,6 +58,15 @@ class _ReviseLLM:
 
     async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
         lowered = user_prompt.lower()
+        # FEAT-009: pedido explícito de desfazer -> força revert_approval.
+        if any(
+            k in lowered
+            for k in ("desfaz", "desfazer", "reverte", "reverter", "volta o card")
+        ):
+            return {
+                "narrative": "Vou desfazer a aprovação automática do card.",
+                "tool_calls": [{"tool": "revert_approval", "input": {}}],
+            }
         if any(k in lowered for k in ("troca", "muda", "postgres", "stack", "revise")):
             return {
                 "narrative": "Vou revisar o plano com a mudança solicitada.",
@@ -85,6 +94,58 @@ async def override_llm(
         raise NotFoundError("Endpoint", "_override_llm (debug only)")
     set_service_overrides(request, llm=_ReviseLLM())
     return success_envelope(data={"overridden": True}, request_id=request_id)
+
+
+@router.post("/{conversation_id}/_seed_auto_approved", response_model=None)
+async def seed_auto_approved_card(
+    conversation_id: UUID,
+    request: Request,
+    request_id: str = Depends(get_request_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Semeia um card auto-aprovado ligado à conversa para o E2E do FEAT-009.
+
+    Cria um card em 'done', com auto_approved=True e revert_deadline dentro da
+    janela de 30 minutos, e o vincula à conversa. Permite validar o
+    revert_approval pelo chat sem rodar o pipeline caro (LLM+MCP). Só em debug.
+    """
+    if not get_settings().debug:
+        raise NotFoundError("Endpoint", "_seed_auto_approved (debug only)")
+
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.card import Card
+    from app.services.conductor import AUTO_APPROVE_REVERT_WINDOW_MIN
+
+    conv = await session.get(Conversation, conversation_id)
+    if conv is None:
+        raise NotFoundError("Conversation", str(conversation_id))
+
+    card = Card(
+        project_id=conv.project_id,
+        column="done",
+        title="Card auto-aprovado (E2E FEAT-009)",
+        confidence_score=0.95,
+        approval_by="auto",
+        auto_approved=True,
+        revert_deadline=datetime.now(tz=timezone.utc)
+        + timedelta(minutes=AUTO_APPROVE_REVERT_WINDOW_MIN),
+    )
+    session.add(card)
+    await session.commit()
+    await session.refresh(card)
+
+    conv.card_id = card.id
+    await session.commit()
+
+    return success_envelope(
+        data={
+            "card_id": str(card.id),
+            "column": card.column,
+            "auto_approved": card.auto_approved,
+        },
+        request_id=request_id,
+    )
 
 
 def _to_conversation_response(c: Conversation) -> ConversationResponse:

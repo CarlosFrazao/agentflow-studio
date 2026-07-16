@@ -309,3 +309,112 @@ def test_inject_context_with_real_learning_memory(
     assert "Base prompt." in result
     assert "Firecrawl caiu na porta 3022" in result
     assert "Lições aprendidas" in result
+
+
+# ---------------------------------------------------------------------------
+# FEAT-009: revert_auto_approval — desfazer auto-approve dentro da janela (R4)
+# ---------------------------------------------------------------------------
+
+
+class _RevertCard:
+    """Card mutável mínimo para exercitar revert_auto_approval (helper puro)."""
+
+    def __init__(
+        self,
+        *,
+        column: str,
+        auto_approved: bool = False,
+        approval_by: str = "none",
+        revert_deadline=None,
+    ) -> None:
+        self.column = column
+        self.auto_approved = auto_approved
+        self.approval_by = approval_by
+        self.revert_deadline = revert_deadline
+
+
+def test_prev_column_returns_previous_in_pipeline() -> None:
+    from app.services.orchestrator import prev_column
+
+    assert prev_column("done") == "production"
+    assert prev_column("production") == "reviewing"
+    assert prev_column("researching") == "backlog"
+    # backlog é o início: não há coluna anterior.
+    assert prev_column("backlog") == "backlog"
+
+
+def test_prev_column_rejects_invalid_column() -> None:
+    from app.services.orchestrator import prev_column
+
+    with pytest.raises(ValueError):
+        prev_column("coluna-inexistente")
+
+
+def test_revert_within_window_reverts_column_and_clears_flags() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.orchestrator import revert_auto_approval
+
+    future = datetime.now(tz=timezone.utc) + timedelta(minutes=10)
+    card = _RevertCard(
+        column="done",
+        auto_approved=True,
+        approval_by="auto",
+        revert_deadline=future,
+    )
+    ok = revert_auto_approval(card)
+    assert ok is True
+    assert card.column == "production"  # done -> production
+    assert card.auto_approved is False
+    assert card.approval_by == "none"
+    assert card.revert_deadline is None
+
+
+def test_revert_outside_window_returns_false_and_keeps_state() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.orchestrator import revert_auto_approval
+
+    past = datetime.now(tz=timezone.utc) - timedelta(minutes=1)
+    card = _RevertCard(
+        column="done",
+        auto_approved=True,
+        approval_by="auto",
+        revert_deadline=past,
+    )
+    ok = revert_auto_approval(card)
+    assert ok is False
+    # Estado preservado: nada é revertido fora da janela.
+    assert card.column == "done"
+    assert card.auto_approved is True
+    assert card.approval_by == "auto"
+
+
+def test_revert_when_not_auto_approved_returns_false() -> None:
+    from app.services.orchestrator import revert_auto_approval
+
+    card = _RevertCard(column="reviewing", auto_approved=False)
+    ok = revert_auto_approval(card)
+    assert ok is False
+    assert card.column == "reviewing"
+
+
+def test_revert_at_backlog_does_not_break() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.orchestrator import revert_auto_approval
+
+    future = datetime.now(tz=timezone.utc) + timedelta(minutes=10)
+    card = _RevertCard(
+        column="backlog",
+        auto_approved=True,
+        approval_by="auto",
+        revert_deadline=future,
+    )
+    ok = revert_auto_approval(card)
+    assert ok is True
+    # backlog não tem coluna anterior: permanece em backlog, mas limpa flags.
+    assert card.column == "backlog"
+    assert card.auto_approved is False
+    assert card.approval_by == "none"
+    assert card.revert_deadline is None
