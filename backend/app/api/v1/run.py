@@ -11,7 +11,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_owned_card, get_request_id
 from app.services.deps import (
     get_firecrawl,
     get_github,
@@ -54,8 +54,7 @@ AUTO_APPROVE_REVERT_WINDOW_MIN = 30
 
 @router.post("/{card_id}/run", response_model=None)
 async def run_card(
-    card_id: UUID,
-    request: Request,
+    card: Card = Depends(get_owned_card),
     request_id: str = Depends(get_request_id),
 
     session: AsyncSession = Depends(get_session),
@@ -65,10 +64,6 @@ async def run_card(
     github=Depends(get_github),
     sandbox=Depends(get_sandbox),
 ) -> dict:
-    card = await session.get(Card, card_id)
-    if not card:
-        raise NotFoundError("Card", str(card_id))
-
     agent_name = next_agent_for_column(card.column)
     if agent_name is None:
         return success_envelope(

@@ -2,16 +2,17 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError, ValidationError
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_current_user, get_owned_card, get_request_id
 from app.core.responses import paginated_envelope, success_envelope
 from app.models.card import KANBAN_COLUMNS, Card
 from app.models.project import Project
+from app.models.user import User
 from app.schemas.card import CardCreate, CardResponse, CardUpdate
 from app.services.event_bus import Event, event_bus
 from app.services.prompt_hydration import hydrate_prompt
@@ -21,10 +22,13 @@ router = APIRouter(prefix="/cards", tags=["cards"])
 
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_card(
-    body: CardCreate, request_id: str = Depends(get_request_id), session: AsyncSession = Depends(get_session)
+    body: CardCreate,
+    request_id: str = Depends(get_request_id),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
     project = await session.get(Project, body.project_id)
-    if not project:
+    if not project or project.user_id != user.id:
         raise ValidationError("project_id invalido ou inexistente")
     # Item C: hidrata o título do usuário (PT informal -> EN técnico + regras).
     # llm=None mantém o caminho síncrono determinístico (zero I/O) neste
@@ -59,6 +63,7 @@ async def create_card(
 @router.get("", response_model=None)
 async def list_cards(
     request_id: str = Depends(get_request_id),
+    user: User = Depends(get_current_user),
 
     session: AsyncSession = Depends(get_session),
     project_id: UUID | None = Query(default=None),
@@ -66,6 +71,11 @@ async def list_cards(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
 ) -> dict:
+    # Valida que o project_id (se informado) pertence ao usuário.
+    if project_id is not None:
+        proj = await session.get(Project, project_id)
+        if proj is None or proj.user_id != user.id:
+            raise NotFoundError("Project", str(project_id))
     stmt = select(Card)
     if project_id is not None:
         stmt = stmt.where(Card.project_id == project_id)
@@ -93,11 +103,9 @@ async def list_cards(
 
 @router.get("/{card_id}", response_model=None)
 async def get_card(
-    card_id: UUID, request_id: str = Depends(get_request_id), session: AsyncSession = Depends(get_session)
+    card: Card = Depends(get_owned_card),
+    request_id: str = Depends(get_request_id),
 ) -> dict:
-    card = await session.get(Card, card_id)
-    if not card:
-        raise NotFoundError("Card", str(card_id))
     return success_envelope(
         data=CardResponse.model_validate(card).model_dump(mode="json"),
         request_id=request_id,
@@ -106,15 +114,11 @@ async def get_card(
 
 @router.patch("/{card_id}", response_model=None)
 async def update_card(
-    card_id: UUID,
-    body: CardUpdate,
+    card: Card = Depends(get_owned_card),
+    body: CardUpdate = Body(...),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    card = await session.get(Card, card_id)
-    if not card:
-        raise NotFoundError("Card", str(card_id))
     if body.title is not None:
         card.title = body.title
     if body.column is not None:
@@ -141,10 +145,8 @@ async def update_card(
 
 @router.delete("/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_card(
-    card_id: UUID, session: AsyncSession = Depends(get_session)
+    card: Card = Depends(get_owned_card),
+    session: AsyncSession = Depends(get_session),
 ) -> None:
-    card = await session.get(Card, card_id)
-    if not card:
-        raise NotFoundError("Card", str(card_id))
     await session.delete(card)
     await session.commit()

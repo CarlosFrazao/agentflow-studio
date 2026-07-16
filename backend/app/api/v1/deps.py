@@ -5,9 +5,16 @@ import uuid
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
 from app.core.database import get_session
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import NotFoundError, UnauthorizedError
 from app.core.security import decode_access_token
+from app.models.card import Card
+from app.models.conversation import Conversation
+from app.models.project import Project
 from app.models.user import User
 
 
@@ -37,3 +44,61 @@ async def get_current_user(
     if user is None:
         raise UnauthorizedError("usuario nao encontrado")
     return user
+
+
+# ---------------------------------------------------------------------------
+# Authorization (OWASP API1: Broken Object Level Authorization)
+# O sistema tem auth JWT multi-usuário ativa, mas os recursos são isolados
+# por user_id. Estas dependências garantem que um usuário só acesse/modifique
+# recursos que ele de fato possui — sem isso, qualquer usuário logado
+# poderia enumerar UUIDs alheios (IDOR).
+# ---------------------------------------------------------------------------
+
+
+async def get_owned_project(
+    project_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Project:
+    """Devolve o Project se ele pertencer ao usuário; 404 caso contrário.
+
+    404 (e não 403) para não vazar a existência do recurso de outro dono.
+    """
+    project = await session.get(Project, project_id)
+    if project is None or project.user_id != user.id:
+        raise NotFoundError("Project", str(project_id))
+    return project
+
+
+async def get_owned_card(
+    card_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Card:
+    """Devolve o Card se o Project pai pertencer ao usuário; 404 c.c.
+
+    Card não tem user_id próprio: herda do Project via project_id.
+    """
+    card = await session.get(Card, card_id)
+    if card is None:
+        raise NotFoundError("Card", str(card_id))
+    project = await session.get(Project, card.project_id)
+    if project is None or project.user_id != user.id:
+        raise NotFoundError("Card", str(card_id))
+    return card
+
+
+async def get_owned_conversation(
+    conversation_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Conversation:
+    """Devolve a Conversation se o Project pai pertencer ao usuário; 404 c.c."""
+    conv = await session.get(Conversation, conversation_id)
+    if conv is None:
+        raise NotFoundError("Conversation", str(conversation_id))
+    project = await session.get(Project, conv.project_id)
+    if project is None or project.user_id != user.id:
+        raise NotFoundError("Conversation", str(conversation_id))
+    return conv
+

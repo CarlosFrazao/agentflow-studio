@@ -13,14 +13,20 @@ Contrato (Plano F-023 §4):
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import (
+    get_current_user,
+    get_owned_conversation,
+    get_request_id,
+)
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.responses import success_envelope
 from app.models.conversation import Conversation, Message
+from app.models.project import Project
+from app.models.user import User
 from app.schemas.conductor import (
     ConversationCreate,
     ConversationMessagesResponse,
@@ -167,8 +173,8 @@ def _to_message_response(m: Message) -> MessageResponse:
 @router.post("", response_model=None)
 async def create_conversation(
     payload: ConversationCreate,
-    request: Request,
     request_id: str = Depends(get_request_id),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     llm=Depends(get_llm),
     sra=Depends(get_sra),
@@ -176,7 +182,11 @@ async def create_conversation(
     github=Depends(get_github),
     sandbox=Depends(get_sandbox),
 ) -> dict:
-    conv = Conversation(project_id=payload.project_id)
+    # Valida que o project_id pertence ao usuário (IDOR).
+    project = await session.get(Project, payload.project_id)
+    if project is None or project.user_id != user.id:
+        raise NotFoundError("Project", str(payload.project_id))
+    conv = Conversation(project_id=project.id)
     session.add(conv)
     await session.commit()
     await session.refresh(conv)
@@ -189,9 +199,8 @@ async def create_conversation(
 
 @router.post("/{conversation_id}/messages", response_model=None)
 async def post_message(
-    conversation_id: UUID,
-    payload: ConductorTurnRequest,
-    request: Request,
+    conv: Conversation = Depends(get_owned_conversation),
+    payload: ConductorTurnRequest = Body(...),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
     llm=Depends(get_llm),
@@ -200,9 +209,7 @@ async def post_message(
     github=Depends(get_github),
     sandbox=Depends(get_sandbox),
 ) -> dict:
-    conv = await session.get(Conversation, conversation_id)
-    if conv is None:
-        raise NotFoundError("Conversation", str(conversation_id))
+    conversation_id = conv.id
 
     conductor = Conductor(
         conversation=conv,
@@ -237,16 +244,11 @@ async def post_message(
 
 @router.get("/{conversation_id}/messages", response_model=None)
 async def list_messages(
-    conversation_id: UUID,
-    request: Request,
+    conv: Conversation = Depends(get_owned_conversation),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    conv = await session.get(Conversation, conversation_id)
-    if conv is None:
-        raise NotFoundError("Conversation", str(conversation_id))
-
-    stmt = select(Message).where(Message.conversation_id == conversation_id).order_by(
+    stmt = select(Message).where(Message.conversation_id == conv.id).order_by(
         Message.created_at.asc(), Message.id.asc()
     )
     messages = (await session.execute(stmt)).scalars().all()
