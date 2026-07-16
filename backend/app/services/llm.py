@@ -246,22 +246,22 @@ class OllamaClient(LLMClient):
 def build_llm_chain() -> list[LLMClient]:
     """Constrói a cadeia de provedores na ordem de prioridade (settings).
 
-    Ordem (benchmark 2026-07-16): Groq (llama-3.1-8b-instant, 5/5 acertos,
-    ~1.3s) -> Gemini (gemini-2.5-flash, 4/5, ~7s) -> OpenRouter (conta free
-    atualmente limitada: 404/429, mantido por último como fallback remoto
-    caso a conta volte a ter crédito).
+    Ordem (quality benchmark 2026-07-16): Groq 70B (llama-3.3-70b-versatile,
+    qualidade 5.0/5.0, ~2.2s) -> Gemini (gemini-2.5-flash, 5.0/5.0, ~10s) ->
+    OpenRouter (conta free limitada: 404/429, mantido por último como fallback
+    remoto caso a conta volte a ter crédito) -> Ollama (local).
     """
     settings = get_settings()
     chain: list[LLMClient] = []
 
-    # 1. Groq (primário — free tier estável e rápido)
+    # 1. Groq 70B (primário — free tier, maior qualidade de saída)
     if settings.groq_api_key:
         chain.append(GroqClient(
             api_key=settings.groq_api_key,
             model=settings.groq_model,
         ))
 
-    # 2. Gemini (fallback secundário)
+    # 2. Gemini (fallback secundário — mesma qualidade, mais lento)
     if settings.gemini_api_key:
         chain.append(GeminiClient(
             api_key=settings.gemini_api_key,

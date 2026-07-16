@@ -75,12 +75,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
 
     # LLM — provedores alternativos com fallback (sem chave = desativado)
-    # Ordem de prioridade (benchmark 2026-07-16): Groq primário, Gemini
-    # secundário, OpenRouter remoto por último (conta free pode estar limitada).
+    # Ordem de prioridade (quality benchmark 2026-07-16): Groq 70B primário
+    # (qualidade 5.0/5.0, ~2.2s), Gemini 2.5 Flash secundário (5.0/5.0, ~10s),
+    # OpenRouter remoto por último (conta free 404/429 — indisponível),
+    # Ollama local como fallback final.
     openrouter_api_key: str | None = None
     openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
     groq_api_key: str | None = None
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model: str = "llama-3.3-70b-versatile"
     ollama_base_url: str | None = None
     ollama_model: str = "llama3.1"
 
