@@ -1947,3 +1947,49 @@ recriado** — registro neste `handoff.md` + `chat_log.md`.
 - Resultado: **13/13 PASS, 0 erros críticos** (console/pageerror/HTTP 4xx/5xx).
   Vídeo em `Evidencias/page@cf64b392071feb37e5424f187285fd69.webm`,
   screenshots `screenshots/cx1_login.png`…`cx11_resumo.png`.
+
+---
+
+## Correção de Modelo — 70B como PRIMÁRIO (qualidade, não velocidade) — 2026-07-16
+
+> **Reclamação do usuário (correta):** eu tinha deixado o **Groq 8B** como
+> primário "porque era mais rápido" — mas o usuário pediu o **modelo free de
+> MAIOR QUALIDADE**, não o mais básico. O 8B é exatamente o "básico" que ele
+> reclamou.
+
+### Quality benchmark (tarefa REAL: ideia vaga → brief + plano + código)
+| Modelo free | Qualidade | Tempo | JSON válido |
+|---|---|---|---|
+| **Groq `llama-3.3-70b-versatile`** | **5.0/5.0** | 2.2s | ✅ |
+| Gemini `gemini-2.5-flash` | 5.0/5.0 | 10.6s | ✅ |
+| Groq `llama-3.1-8b-instant` (antigo primário) | **1.0/5.0** | 1.4s | ❌ |
+
+O 8B **nem JSON válido devolveu** na tarefa complexa; o 70B e o Gemini foram
+perfeitos. O 70B é ~5x mais lento que o 8B mas **free** e qualidade máxima.
+
+### Decisão aplicada
+- `app/core/config.py`: `GROQ_MODEL` (primário) = `llama-3.3-70b-versatile`.
+  O 8B (`llama-3.1-8b-instant`) rebaixado para `aux_groq_model` — usado **só**
+  na compressão de artefatos (Fase B1), onde velocidade > profundidade.
+- `app/services/llm.py` (`build_llm_chain`): comentário atualizado para o
+  quality benchmark; ordem segue Groq→Gemini→OpenRouter→Ollama (inalterada).
+- `backend/.env`: `GROQ_MODEL=llama-3.3-70b-versatile` (chaves preservadas).
+- Backend rebuildado (`docker compose up -d --build agentflow-backend`);
+  health ok. Script `benchmark_quality.py` temporário removido.
+
+### Validação E2E (ARES, R33 — Playwright local, headless)
+- `ares-conductor-complex.js` reexecutado com **70B primário**:
+  **13/13 PASS, 0 erros críticos** (ideia vaga, refino, research, planner,
+  pivot, follow-up, dev, review, coesão). Vídeo em
+  `Evidencias/page@00be2ab035b212862f1f79a52d006d2e.webm`.
+
+### Git
+- Commit `dd7f1de` (`fix: promove Groq llama-3.3-70b-versatile a primario
+  (qualidade 5.0/5.0)`), push `999e2e1..dd7f1de` em `origin/master`. Escopo
+  explícito (2 arquivos backend); `.env` protegido pelo `.gitignore`.
+
+### Estado atual da cadeia LLM (free, por qualidade)
+1. **Groq `llama-3.3-70b-versatile`** — PRIMÁRIO (qualidade máxima, free)
+2. Gemini `gemini-2.5-flash` — fallback secundário (qualidade máx., lento)
+3. Groq `llama-3.1-8b-instant` — só compressão de artefatos (auxiliar)
+4. OpenRouter free — último fallback (indisponível: 404/429)

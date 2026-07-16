@@ -713,3 +713,26 @@ contexto de tarefas/lembretes após o pivot. Vídeo + 11 screenshots em
 
 **Conclusão:** nenhum bug de app encontrado — só 1 teste obsoleto (corrigido).
 Pipeline do Conductor estável ponta a ponta com Groq free.
+
+---
+
+## 2026-07-16 (noite, 3ª rodada) — Correção: 70B como primário (qualidade)
+
+**Reclamação do usuário (justa):** eu tinha deixado o Groq 8B como primário
+"porque era mais rápido", mas ele pediu o modelo free de **maior qualidade**,
+não o básico. O 8B era exatamente o "básico".
+
+**Quality benchmark (tarefa real: ideia vaga → brief + plano + código):**
+- Groq `llama-3.3-70b-versatile`: **5.0/5.0**, ~2.2s → **PRIMÁRIO**.
+- Gemini `gemini-2.5-flash`: 5.0/5.0, ~10.6s → fallback.
+- Groq `llama-3.1-8b-instant` (antigo primário): **1.0/5.0**, JSON inválido →
+  rebaixado para auxiliar de compressão de artefatos.
+
+**Aplicado:** `config.py` GROQ_MODEL=70B; 8B vira `aux_groq_model`; `llm.py`
+comentário atualizado; `.env` ajustado; backend rebuildado. Suíte unitária
+exit 0. `ares-conductor-complex.js` reexecutado com 70B → **13/13 PASS, 0
+erros críticos**. Commit `dd7f1de` → `origin/master`.
+
+**Resultado:** cadeia LLM agora roda no modelo free de MAIOR qualidade (70B,
+5.0/5.0). Resposta à pergunta do usuário: sim, a IA agora entrega trabalho de
+qualidade alta, não básica.
