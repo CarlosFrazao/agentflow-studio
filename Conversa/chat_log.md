@@ -686,3 +686,30 @@ Dev/Reviewer orquestrados via chat). Commit `0fc149c` → `origin/master`.
 **Resultado:** cadeia LLM agora roda em modelos free confiáveis; OpenRouter
 free desativado da rotação ativa por estar quebrado (404/429). Tarefa do
 usuário concluída.
+
+---
+
+## 2026-07-16 (noite, 2ª rodada) — Testes unitários + ARES complexo
+
+**Solicitação:** "rode os testes novamente. e liste os erros e bugs que você acha
+durante esses testes. faça um teste um pouco mais complexo para vê se a ia vai
+conseguir executar."
+
+**Unitários (backend/pytest):** ao rodar a suíte após a troca de modelo, **1
+teste falhou**: `test_build_llm_chain_uses_settings` — ele ainda esperava
+`OpenRouterClient` na posição 0 da cadeia (ordem antiga). Não é bug do app: é
+teste obsoleto. Corrigido o assert para `GroqClient[0]→GeminiClient[1]→
+OpenRouterClient[2]→OllamaClient[3]`. Suíte reassim **exit 0, 0 failed**.
+Commit `6995389` → `origin/master`.
+
+**ARES COMPLEXO (novo script `ares-conductor-complex.js`):** cenários difíceis —
+ideia vaga/ambígua (sem nome, sem escopo), refino iterativo, pivot de requisito
+APÓS o planner, follow-up com pergunta ("qual a melhor stack? explica o por
+quê"), dev, review+melhoria, e checagem de coesão do card. **Resultado: 13/13
+PASS, 0 erros críticos.** A IA executou todos os cenários complexos sem travar;
+o nome derivado veio correto (não "Projeto sem nome") e o card manteve o
+contexto de tarefas/lembretes após o pivot. Vídeo + 11 screenshots em
+`Ambiente Testes/`.
+
+**Conclusão:** nenhum bug de app encontrado — só 1 teste obsoleto (corrigido).
+Pipeline do Conductor estável ponta a ponta com Groq free.

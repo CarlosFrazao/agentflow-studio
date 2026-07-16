@@ -1917,3 +1917,33 @@ recriado** — registro neste `handoff.md` + `chat_log.md`.
 - Commit `0fc149c` (`fix: prioriza Groq (llama-3.1-8b-instant) na cadeia LLM;
   OpenRouter free indisponível`), push `8b31e10..0fc149c` em `origin/master`.
   Escopo explícito (2 arquivos backend); `.env` protegido pelo `.gitignore`.
+
+### Bug de teste encontrado na 2ª rodada (2026-07-16, noite)
+- **Achado:** `tests/test_llm.py::test_build_llm_chain_uses_settings` FALHAVA
+  (1 falha) ao rodar a suíte após a troca de modelo. O teste ainda documentava
+  a ORDEM ANTIGA (OpenRouter na posição 0). Não é bug do app — é teste
+  obsoleto frente à nova cadeia Groq→Gemini→OpenRouter→Ollama.
+- **Correção:** atualizado o assert para a ordem correta
+  (`GroqClient[0] → GeminiClient[1] → OpenRouterClient[2] → OllamaClient[3]`).
+- **Suíte após correção:** **exit 0, 0 failed** (todos os testes passando).
+- **Commit `6995389`** (`test: atualiza ordem esperada da cadeia LLM...`),
+  push `f4a41c0..6995389` em `origin/master`.
+
+### Teste ARES COMPLEXO (novo, 2026-07-16, noite) — 13/13 PASS, 0 erros
+- `Ambiente Testes/logic/ares-conductor-complex.js` (novo; gitignored).
+  Cenários difíceis além do pipeline linear:
+  1. **Ideia VAGA/AMBÍGUA** ("preciso de algo pra ajudar a organizar minha
+     vida, tipo um app") → Conductor respondeu e derivou nome **sem** cair em
+     "Projeto sem nome" (corrigido na F-002).
+  2. **Refino iterativo** (usuário detalha "tarefas e lembretes, notificação no
+     celular") → absorvido.
+  3. **Research / Planner** normais.
+  4. **Pivot de requisito APÓS o planner** ("quero que seja web também, não só
+     celular") → processado sem quebrar.
+  5. **Follow-up / pergunta** ("qual a melhor stack? me explica o por quê") →
+     respondeu com explicação.
+  6. **Dev / Review+melhoria** → processados.
+  7. **Coesão do card** → mantém contexto de tarefas/lembretes.
+- Resultado: **13/13 PASS, 0 erros críticos** (console/pageerror/HTTP 4xx/5xx).
+  Vídeo em `Evidencias/page@cf64b392071feb37e5424f187285fd69.webm`,
+  screenshots `screenshots/cx1_login.png`…`cx11_resumo.png`.
