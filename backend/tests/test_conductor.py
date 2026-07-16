@@ -899,3 +899,125 @@ async def test_freeform_question_returns_narrative_only(
     assert resp["awaiting_user"] is False
     card = await client.get("/api/v1/cards/" + to_planning["card_id"])
     assert card.json()["data"]["column"] == "planning"
+
+
+# ---------------------------------------------------------------------------
+# FEAT-006: get_artifact — busca conteúdo COMPLETO de etapa já executada (C-1)
+# ---------------------------------------------------------------------------
+
+async def test_get_artifact_returns_real_content_after_research(
+    session_factory, monkeypatch
+) -> None:
+    """Dado Research rodou, get_artifact('research') devolve o conteúdo REAL.
+
+    Não o resumo de 1 linha ('Research Agent concluído'), e sim o conteúdo
+    completo do artifact (ex.: sra_report com detalhes de concorrentes).
+    """
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import Conductor, TOOL_GET_ARTIFACT
+    from app.services.pipeline_helpers import latest_artifact_content
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="researching", title="App de caronas")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        # Persiste um artifact de research COM detalhe real (concorrentes).
+        real_report = (
+            "# Relatório de Pesquisa\n\n## Concorrentes\n"
+            "- BlaBlaCar: caronas intermunicipais\n"
+            "- Waze Carpool: foco em trajetos diários\n"
+            "## Dores\n- confiança entre estranhos"
+        )
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        await s.commit()
+        # Insere o artifact diretamente via persist do conductor.
+        await cond._persist_artifact(card, "research", real_report)
+
+        # get_artifact('research') devolve o conteúdo COMPLETO.
+        result = await cond._run_tool(TOOL_GET_ARTIFACT, card, {"agent_name": "research"})
+        assert result["output"].get("error") is None
+        content = result["output"].get("content")
+        assert content is not None
+        # Detalhe real presente (não apenas o resumo da bolha de tool).
+        assert "BlaBlaCar" in content
+        assert "Waze Carpool" in content
+        # O conteúdo no banco coincide com o devolvido.
+        stored = await latest_artifact_content(s, card.id, "research")
+        assert stored == content
+
+        # get_artifact NÃO avança o card (tool somente-leitura).
+        await s.refresh(card)
+        assert card.column == "researching"
+
+
+async def test_get_artifact_errors_clearly_when_step_not_run(
+    session_factory, monkeypatch
+) -> None:
+    """Dado etapa 'dev' ainda não rodou, get_artifact('dev') erro claro (não exceção)."""
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import Conductor, TOOL_GET_ARTIFACT
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="planning", title="App")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+
+        # 'dev' não rodou: erro claro, sem exceção não tratada.
+        result = await cond._run_tool(TOOL_GET_ARTIFACT, card, {"agent_name": "dev"})
+        assert result["output"].get("error") == "essa etapa ainda não foi executada"
+        assert "content" not in result["output"]
+
+        # agent_name fora da whitelist: erro claro (anti-injection).
+        bad = await cond._run_tool(TOOL_GET_ARTIFACT, card, {"agent_name": "hacker"})
+        assert bad["output"].get("error") == "etapa invalida"
+
+
+async def test_get_artifact_works_in_done_column(
+    session_factory, monkeypatch
+) -> None:
+    """get_artifact é GLOBAL: funciona em qualquer coluna, inclusive 'done'."""
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.conductor import Conductor, TOOL_GET_ARTIFACT
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="done", title="App finalizado")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        await s.commit()
+
+        # Ideation rodou no passado; em 'done' ainda podemos buscar o conteúdo.
+        ideation_content = '{"project_name": "CaronasFaculdade", "key_features": ["match"]}'
+        await cond._persist_artifact(card, "ideation", ideation_content)
+
+        result = await cond._run_tool(TOOL_GET_ARTIFACT, card, {"agent_name": "ideation"})
+        assert result["output"].get("error") is None
+        assert result["output"]["content"] == ideation_content
+        # Card permanece em 'done' (tool não mexe na coluna).
+        await s.refresh(card)
+        assert card.column == "done"

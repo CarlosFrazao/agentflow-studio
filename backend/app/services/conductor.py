@@ -59,18 +59,32 @@ TOOL_GET_CARD_STATE = "get_card_state"
 TOOL_ASK_USER = "ask_user"
 TOOL_CONFIRM_IDEATION = "confirm_ideation"
 TOOL_ANSWER = "answer_question"
+TOOL_GET_ARTIFACT = "get_artifact"
+
+# Etapas cujo conteúdo COMPLETO pode ser consultado via get_artifact.
+# Whitelist defensiva: impede injection de agent_name arbitrário.
+GET_ARTIFACT_WHITELIST: frozenset[str] = frozenset(
+    {"ideation", "research", "code_research", "planner", "reviewer", "dev"}
+)
+
+# Ferramentas GLOBAIS (válidas em qualquer coluna do card).
+# get_artifact é somente-leitura: busca o conteúdo real de uma etapa já
+# executada, sem avançar o card nem re-executar agente (FEAT-006).
+GLOBAL_TOOLS: list[str] = [TOOL_GET_CARD_STATE, TOOL_GET_ARTIFACT, TOOL_ANSWER]
 
 # Mapeia a coluna atual do card para o conjunto determinístico de ferramentas.
 # Ideation cria o card, então a etapa inicial (sem card) força run_ideation.
 # Em "backlog" com card já criado, o Conductor pausa e oferece confirm_ideation
 # (FEAT-005): o card NÃO avança automaticamente após a ideation.
+# Toda coluna também expõe as GLOBAL_TOOLS (get_card_state, get_artifact,
+# answer_question) — assim get_artifact funciona em qualquer estágio.
 COLUMN_TO_TOOLS: dict[str, list[str]] = {
-    "backlog": [TOOL_IDEATION, TOOL_CONFIRM_IDEATION],
-    "researching": [TOOL_RESEARCH, TOOL_CODE_RESEARCH],
-    "planning": [TOOL_PLANNER],
-    "reviewing": [TOOL_REVIEWER],
-    "production": [TOOL_DEV],
-    "done": [TOOL_GET_CARD_STATE],
+    "backlog": [TOOL_IDEATION, TOOL_CONFIRM_IDEATION] + GLOBAL_TOOLS,
+    "researching": [TOOL_RESEARCH, TOOL_CODE_RESEARCH] + GLOBAL_TOOLS,
+    "planning": [TOOL_PLANNER] + GLOBAL_TOOLS,
+    "reviewing": [TOOL_REVIEWER] + GLOBAL_TOOLS,
+    "production": [TOOL_DEV] + GLOBAL_TOOLS,
+    "done": [TOOL_GET_CARD_STATE] + GLOBAL_TOOLS,
 }
 
 _SYSTEM_PROMPT = (
@@ -90,7 +104,12 @@ _SYSTEM_PROMPT = (
     "quando o usuário fizer uma pergunta ou discussão sobre o que já foi feito "
     "(sem intenção de avançar o pipeline), use \"answer_question\" com "
     '"tool_calls":[] e apenas "narrative" — NÃO rode o próximo agente nem avance '
-    'o card. Nunca invente ferramentas fora desta lista.'
+    'o card. (10) se o usuário perguntar DETALHES de uma etapa já concluída '
+    '(ex: "o que o Research encontrou sobre concorrentes?"), use "get_artifact" '
+    'com {"agent_name": "<ideation|research|code_research|planner|reviewer|dev>"} '
+    'para buscar o CONTEÚDO REAL do artifact ANTES de responder — NÃO responda de '
+    'memória do resumo narrado nem resuma por conta própria. get_artifact é '
+    "somente-leitura (não avança o card). Nunca invente ferramentas fora desta lista."
 )
 
 
@@ -389,6 +408,8 @@ class Conductor:
             return await self._tool_card_state(card)
         if name == TOOL_CONFIRM_IDEATION:
             return await self._tool_confirm_ideation(card, user_input or {})
+        if name == TOOL_GET_ARTIFACT:
+            return await self._tool_get_artifact(card, user_input or {})
         if name == TOOL_ANSWER:
             return self._tool_answer_question(card)
         return {"tool": name, "input": {}, "output": {}, "card": card}
@@ -732,6 +753,41 @@ class Conductor:
             "tool": TOOL_ANSWER,
             "input": {},
             "output": {"answered": True},
+            "card": card,
+        }
+
+    async def _tool_get_artifact(
+        self, card: Card | None, user_input: dict
+    ) -> dict[str, Any]:
+        """Busca o conteúdo COMPLETO de uma etapa já executada (FEAT-006, C-1).
+
+        Tool GLOBAL e somente-leitura: NÃO avança o card nem re-executa agente.
+        `agent_name` é validado contra a whitelist; etapa ausente devolve erro
+        claro (não exceção). O conteúdo NÃO é truncado (diferente do resumo de
+        tool exibido na bolha de chat).
+        """
+        if card is None:
+            return self._no_card(TOOL_GET_ARTIFACT)
+        agent_name = (user_input or {}).get("agent_name")
+        if agent_name not in GET_ARTIFACT_WHITELIST:
+            return {
+                "tool": TOOL_GET_ARTIFACT,
+                "input": user_input or {},
+                "output": {"error": "etapa invalida"},
+                "card": card,
+            }
+        content = await latest_artifact_content(self._session, card.id, agent_name)
+        if content is None:
+            return {
+                "tool": TOOL_GET_ARTIFACT,
+                "input": user_input or {},
+                "output": {"error": "essa etapa ainda não foi executada"},
+                "card": card,
+            }
+        return {
+            "tool": TOOL_GET_ARTIFACT,
+            "input": user_input or {},
+            "output": {"content": content},
             "card": card,
         }
 
