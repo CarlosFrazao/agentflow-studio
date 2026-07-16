@@ -72,6 +72,15 @@
 - Pendente: executar fluxo FEAT-007 manualmente (ARES) e validar — **SÓ O
   CLAUDE-MESTRE MARCA ESTE [x]**.
 
+### 2.6 — RECUPERAÇÃO E PUSH (2026-07-16, Claude Code CLI)
+- Terminal anterior travou por 429 LiteLLM ao ler o screenshot (tentativa 7/10).
+  Recuperado via `Conversa/recovery_feat007.md`: pulou leitura manual de imagem
+  (`feat007_memory_check_2026-07-16T03-50-23.png` já validado na sessão anterior).
+- **POST-CHECK ZEUS re-rodado:** Anti-TODO=0, Anti-hermes=0, `pytest -q`=**318 passed / 0 failed**.
+- Commit `c293782` (feat: FEAT-007 token-budget conversation memory) já presente
+  localmente na sessão anterior; ** enviado ao GitHub `origin/master` ** nesta recovery.
+- FEAT-007 100% entregue e sincronizada com o remoto.
+
 ---
 
 ## Status dos Blocos (task.md)
