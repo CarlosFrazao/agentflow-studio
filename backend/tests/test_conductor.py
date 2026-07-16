@@ -1024,6 +1024,227 @@ async def test_get_artifact_works_in_done_column(
 
 
 # ---------------------------------------------------------------------------
+# FEAT-008: revise_artifact — ajuste pontual sem reiniciar o pipeline (C-3)
+# ---------------------------------------------------------------------------
+
+async def test_revise_artifact_creates_new_version_without_rerunning_upstream(
+    session_factory, monkeypatch
+) -> None:
+    """Dado Planner rodou, 'troca pra Postgres' gera NOVO artifact de planner.
+
+    - NÃO re-executa Research/Code Research (montante).
+    - O card NÃO muda de coluna (permanece em 'planning').
+    - O artifact anterior é marcado `superseded` em `card.meta['artifact_versions']`.
+    """
+    from sqlalchemy import select
+
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.agents.planner import PlannerAgent, PlannerOutput
+    from app.services.agents.research import ResearchAgent, ResearchOutput
+    from app.services.agents.code_research import (
+        CodeResearchAgent,
+        CodeResearchOutput,
+    )
+    from app.services.conductor import Conductor, TOOL_REVISE_ARTIFACT
+    from app.services.pipeline_helpers import latest_artifact_content
+
+    upstream_ran = {"research": False, "code_research": False, "planner": 0}
+
+    async def fake_research(self, query, mode="guerrilha"):  # noqa: ANN001
+        upstream_ran["research"] = True
+        return ResearchOutput(sra_report="# r", confidence=0.9)
+
+    async def fake_code_research(self, **kwargs):  # noqa: ANN001
+        upstream_ran["code_research"] = True
+        return CodeResearchOutput(suggestions=["a"], license_class="permissive")
+
+    async def fake_planner(self, ideation, research, code_research):  # noqa: ANN001
+        upstream_ran["planner"] += 1
+        return PlannerOutput(title="t", stack=["py"], milestones=[], risks=[])
+
+    monkeypatch.setattr(ResearchAgent, "run", fake_research)
+    monkeypatch.setattr(CodeResearchAgent, "run", fake_code_research)
+    monkeypatch.setattr(PlannerAgent, "run", fake_planner)
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="planning", title="App de caronas")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        # Artifact de planner original (antes da revisão).
+        await cond._persist_artifact(card, "planner", '{"stack": ["py"]}')
+
+        result = await cond._run_tool(
+            TOOL_REVISE_ARTIFACT, card,
+            {"agent_name": "planner", "instruction": "troca pra Postgres"},
+        )
+        assert result["output"].get("error") is None
+        assert result["output"].get("revision_created") is True
+        # O card NÃO muda de coluna durante a revisão.
+        await s.refresh(card)
+        assert card.column == "planning"
+        # O Planner foi re-executado exatamente UMA vez (a revisão).
+        assert upstream_ran["planner"] == 1
+        # O montante NÃO foi re-executado.
+        assert upstream_ran["research"] is False
+        assert upstream_ran["code_research"] is False
+        # Há DOIS artifacts de planner (original + revisão).
+        arts = (
+            await s.execute(
+                select(Artifact).where(
+                    Artifact.card_id == card.id, Artifact.agent_name == "planner"
+                )
+            )
+        ).scalars().all()
+        assert len(arts) == 2
+        # O artifact_versions marca a versão anterior como superseded.
+        versions = (card.meta or {}).get("artifact_versions", {})
+        planner_versions = versions.get("planner", {})
+        assert planner_versions.get("revisions") == 1
+        assert planner_versions.get("superseded"), "anterior deve ser superseded"
+        assert planner_versions.get("current") is not None
+        # A NOVA versão do planner carrega a instrução de revisão
+        # (rastreabilidade via comentário revise_artifact anexado ao artifact).
+        new_content = next(
+            a.content for a in arts if "revise_artifact" in a.content
+        )
+        assert "Postgres" in new_content
+        # O artifact original (sem o comentário) permanece no banco (não apagado).
+        originals = [a for a in arts if "revise_artifact" not in a.content]
+        assert len(originals) == 1
+
+
+async def test_revise_artifact_enforces_three_revision_limit(
+    session_factory, monkeypatch
+) -> None:
+    """Dado 3 revisões já feitas, a 4ª recebe erro claro (limite de 3)."""
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.agents.planner import PlannerAgent, PlannerOutput
+    from app.services.conductor import Conductor, TOOL_REVISE_ARTIFACT
+
+    async def fake_planner(self, ideation, research, code_research):  # noqa: ANN001
+        return PlannerOutput(title="t", stack=["py"], milestones=[], risks=[])
+
+    monkeypatch.setattr(PlannerAgent, "run", fake_planner)
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="planning", title="App")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        await cond._persist_artifact(card, "planner", '{"stack": ["py"]}')
+
+        # 3 revisões bem-sucedidas.
+        for i in range(3):
+            ok = await cond._run_tool(
+                TOOL_REVISE_ARTIFACT, card,
+                {"agent_name": "planner", "instruction": f"ajuste {i}"},
+            )
+            assert ok["output"].get("error") is None
+        # 4ª chamada -> erro claro.
+        blocked = await cond._run_tool(
+            TOOL_REVISE_ARTIFACT, card,
+            {"agent_name": "planner", "instruction": "ajuste a mais"},
+        )
+        assert blocked["output"].get("error") == "limite de 3 revisoes por etapa atingido"
+        await s.refresh(card)
+        assert (card.meta.get("artifact_versions", {}).get("planner", {}).get("revisions")) == 3
+
+
+async def test_revise_planner_supersedes_reviewer_and_warns(
+    session_factory, monkeypatch
+) -> None:
+    """Revisar planner quando Reviewer já rodou marca reviewer superseded + avisa.
+
+    A narrativa deve informar que o Reviewer precisa rodar de novo.
+    """
+    from app.models.card import Card
+    from app.models.project import Project
+    from app.services.agents.planner import PlannerAgent, PlannerOutput
+    from app.services.agents.reviewer import (
+        ReviewerAgent,
+        ReviewOutput,
+    )
+    from app.services.conductor import (
+        Conductor,
+        TOOL_REVISE_ARTIFACT,
+    )
+    from app.models.conversation import Message
+
+    async def fake_planner(self, ideation, research, code_research):  # noqa: ANN001
+        return PlannerOutput(title="t", stack=["py"], milestones=[], risks=[])
+
+    async def fake_reviewer(self, ideation, research, planner, code_research):  # noqa: ANN001
+        return ReviewOutput(
+            alerts=[], critical_count=0, passed=True,
+            confidence_score=0.95, log_summary=None,
+        )
+
+    monkeypatch.setattr(PlannerAgent, "run", fake_planner)
+    monkeypatch.setattr(ReviewerAgent, "run", fake_reviewer)
+
+    async with session_factory() as s:
+        proj = Project(name="P")
+        s.add(proj)
+        await s.commit()
+        await s.refresh(proj)
+        card = Card(project_id=proj.id, column="reviewing", title="App")
+        s.add(card)
+        await s.commit()
+        await s.refresh(card)
+
+        cond, conv = await _make_conductor(s, proj.id, _SpyLLM())
+        cond._conversation.card_id = card.id
+        await s.commit()
+        # Planner e Reviewer já rodaram (estado pré-revisão).
+        await cond._persist_artifact(card, "planner", '{"stack": ["py"]}')
+        await cond._persist_artifact(card, "reviewer", '{"passed": true}')
+        # Marca o reviewer como já executado no versionamento.
+        meta = dict(card.meta or {})
+        meta["artifact_versions"] = {
+            "planner": {"revisions": 0, "superseded": [], "current": "p1"},
+            "reviewer": {"revisions": 0, "superseded": [], "current": "r1"},
+        }
+        card.meta = meta
+        await s.commit()
+        await s.refresh(card)
+
+        result = await cond._run_tool(
+            TOOL_REVISE_ARTIFACT, card,
+            {"agent_name": "planner", "instruction": "troca pra Postgres"},
+        )
+        assert result["output"].get("error") is None
+        assert result["output"].get("reviewer_superseded") is True
+        # O card NÃO sai da coluna 'reviewing'.
+        await s.refresh(card)
+        assert card.column == "reviewing"
+        # O versionamento marca o reviewer como superseded (lista de ids
+        # desatualizados — estrutura do PRD Seção 1.3).
+        versions = card.meta.get("artifact_versions", {})
+        assert versions.get("reviewer", {}).get("superseded"), "reviewer deve ser marcado superseded"
+        # A narrativa avisa que o Reviewer deve rodar de novo.
+        narrative = result.get("narrative") or ""
+        assert "Reviewer" in narrative
+        assert "rodar" in narrative.lower() or "revis" in narrative.lower()
+
+
+# ---------------------------------------------------------------------------
 # FEAT-007: Memória por orçamento de tokens (C2 / histórico do prompt)
 # ---------------------------------------------------------------------------
 

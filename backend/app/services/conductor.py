@@ -69,6 +69,7 @@ TOOL_ASK_USER = "ask_user"
 TOOL_CONFIRM_IDEATION = "confirm_ideation"
 TOOL_ANSWER = "answer_question"
 TOOL_GET_ARTIFACT = "get_artifact"
+TOOL_REVISE_ARTIFACT = "revise_artifact"
 
 # Etapas cujo conteúdo COMPLETO pode ser consultado via get_artifact.
 # Whitelist defensiva: impede injection de agent_name arbitrário.
@@ -76,10 +77,26 @@ GET_ARTIFACT_WHITELIST: frozenset[str] = frozenset(
     {"ideation", "research", "code_research", "planner", "reviewer", "dev"}
 )
 
+# revise_artifact só aceita re-executar o Planner ou o Dev (FEAT-008).
+# Whitelist restritiva: impede re-executar etapas a montante (Research/Code
+# Research) ou o Reviewer sob demanda — o planner revisado só marca o Reviewer
+# como superseded para re-rodar via fluxo normal.
+REVISE_ARTIFACT_WHITELIST: frozenset[str] = frozenset({"planner", "dev"})
+
+# Limite de revisões por etapa (R5: evita loop de refine infinito).
+MAX_REVISIONS_PER_STEP = 3
+
 # Ferramentas GLOBAIS (válidas em qualquer coluna do card).
 # get_artifact é somente-leitura: busca o conteúdo real de uma etapa já
 # executada, sem avançar o card nem re-executar agente (FEAT-006).
-GLOBAL_TOOLS: list[str] = [TOOL_GET_CARD_STATE, TOOL_GET_ARTIFACT, TOOL_ANSWER]
+# revise_artifact ajusta pontualmente planner/dev sem re-rodar o montante e
+# NÃO avança o card (FEAT-008) — só cria uma nova versão do artifact.
+GLOBAL_TOOLS: list[str] = [
+    TOOL_GET_CARD_STATE,
+    TOOL_GET_ARTIFACT,
+    TOOL_ANSWER,
+    TOOL_REVISE_ARTIFACT,
+]
 
 # Mapeia a coluna atual do card para o conjunto determinístico de ferramentas.
 # Ideation cria o card, então a etapa inicial (sem card) força run_ideation.
@@ -123,6 +140,13 @@ _SYSTEM_PROMPT = (
     "estoura o limite as mensagens mais antigas sao resumidas (bloco "
     '"[RESUMO DAS MENSAGENS ANTERIORES]") em vez de descartadas — preserve sempre '
     "decisoes e fatos da primeira mensagem (ex.: nome do projeto) ao responder. "
+    "(12) se o usuario pedir uma MUDANCA especifica em algo ja gerado (ex: "
+    '"troca a stack pra Postgres", "use React em vez de Vue") e nao for uma '
+    'pergunta, use "revise_artifact" com {"agent_name": "<planner|dev>", '
+    '"instruction": "<pedido literal do usuario>"} — isso re-executa apenas a '
+    "etapa indicada (sem re-rodar Research/Code Research a montante) e cria uma "
+    "NOVA versao do artifact, mantendo o card na MESMA coluna. Nunca use "
+    "revise_artifact para perguntas; para isso use get_artifact/answer_question. "
     "Nunca invente ferramentas fora desta lista."
 )
 
@@ -486,6 +510,8 @@ class Conductor:
             return await self._tool_confirm_ideation(card, user_input or {})
         if name == TOOL_GET_ARTIFACT:
             return await self._tool_get_artifact(card, user_input or {})
+        if name == TOOL_REVISE_ARTIFACT:
+            return await self._tool_revise_artifact(card, user_input or {})
         if name == TOOL_ANSWER:
             return self._tool_answer_question(card)
         return {"tool": name, "input": {}, "output": {}, "card": card}
@@ -870,6 +896,154 @@ class Conductor:
     def _no_card(self, tool: str) -> dict[str, Any]:
         logger.warning("conductor_tool_without_card", tool=tool)
         return {"tool": tool, "input": {}, "output": {"error": "no_card"}, "card": None}
+
+    async def _tool_revise_artifact(
+        self, card: Card | None, user_input: dict
+    ) -> dict[str, Any]:
+        """Ajusta pontualmente planner/dev sem reiniciar o pipeline (FEAT-008, C-3).
+
+        Re-executa APENAS a etapa indicada (`agent_name` ∈ {planner, dev}),
+        passando o artifact anterior + `instruction` como contexto adicional.
+        Cria um NOVO `Artifact` (não apaga o anterior) e marca o anterior como
+        `superseded` em `card.meta["artifact_versions"][agent_name]`. O card NÃO
+        muda de coluna. Se `agent_name == "planner"` e o Reviewer já rodou com o
+        plano antigo, marca `artifact_versions["reviewer"]["superseded"]=True` e
+        avisa que o Reviewer precisa rodar de novo. Limite de 3 revisões/etapa.
+        """
+        if card is None:
+            return self._no_card(TOOL_REVISE_ARTIFACT)
+
+        agent_name = (user_input or {}).get("agent_name")
+        instruction = (user_input or {}).get("instruction") or ""
+        if agent_name not in REVISE_ARTIFACT_WHITELIST:
+            return {
+                "tool": TOOL_REVISE_ARTIFACT,
+                "input": user_input or {},
+                "output": {"error": "etapa invalida para revisao"},
+                "card": card,
+            }
+
+        # Versionamento em meta (sem migration — ADR-C1).
+        meta = dict(card.meta or {})
+        versions = dict(meta.get("artifact_versions", {}))
+        step_versions = dict(versions.get(agent_name, {}))
+        revisions = int(step_versions.get("revisions", 0) or 0)
+        if revisions >= MAX_REVISIONS_PER_STEP:
+            return {
+                "tool": TOOL_REVISE_ARTIFACT,
+                "input": user_input or {},
+                "output": {"error": "limite de 3 revisoes por etapa atingido"},
+                "card": card,
+            }
+
+        # Busca o artifact anterior (contexto para a re-execução).
+        previous_content = await latest_artifact_content(
+            self._session, card.id, agent_name
+        )
+        if previous_content is None:
+            return {
+                "tool": TOOL_REVISE_ARTIFACT,
+                "input": user_input or {},
+                "output": {"error": "essa etapa ainda nao foi executada"},
+                "card": card,
+            }
+        # Id do artifact anterior (o mais recente ANTES de criar a nova revisão).
+        previous_artifact_id = (
+            await self._session.execute(
+                select(Artifact.id).where(
+                    Artifact.card_id == card.id,
+                    Artifact.agent_name == agent_name,
+                ).order_by(Artifact.id.desc()).limit(1)
+            )
+        ).scalar_one()
+
+        # Re-executa APENAS a etapa indicada (montante NÃO roda).
+        if agent_name == "planner":
+            from app.services.agents.planner import PlannerAgent
+
+            out = await PlannerAgent(llm=self._llm).run(
+                ideation=await parse_ideation(
+                    await latest_artifact_content(self._session, card.id, "ideation")
+                ),
+                research=await latest_artifact_content(self._session, card.id, "research") or "",
+                code_research=await latest_artifact_content(self._session, card.id, "code_research") or "",
+            )
+            new_content = out.model_dump_json()
+            # Injeta a instrução de revisão no conteúdo para rastreabilidade.
+            new_content = f"{new_content}\n\n<!-- revise_artifact: {instruction} -->"
+        else:  # dev
+            from app.services.agents.dev import DevAgent
+
+            out = await DevAgent(llm=self._llm, sandbox=self._sandbox).run(
+                previous_content or ""
+            )
+            new_content = out.model_dump_json()
+            new_content = f"{new_content}\n\n<!-- revise_artifact: {instruction} -->"
+
+        # Cria o NOVO artifact (preserva o anterior no banco). Guarda a
+        # referência do objeto para obter o id recém-gerado de forma
+        # determinística (o id é uuid4, não ordenável por tempo).
+        new_artifact = Artifact(
+            card_id=card.id,
+            agent_name=agent_name,
+            type="json",
+            content=new_content,
+        )
+        self._session.add(new_artifact)
+        await self._session.flush()
+        new_artifact_id = new_artifact.id
+
+        # Atualiza o versionamento: anterior -> superseded, novo -> current.
+        superseded = list(step_versions.get("superseded", []) or [])
+        previous_current = step_versions.get("current") or str(previous_artifact_id)
+        if previous_current is not None:
+            superseded.append(str(previous_current))
+        step_versions["revisions"] = revisions + 1
+        step_versions["superseded"] = superseded
+        step_versions["current"] = str(new_artifact_id)
+        versions[agent_name] = step_versions
+
+        reviewer_superseded = False
+        if agent_name == "planner" and "reviewer" in versions:
+            # O Reviewer foi executado com o plano antigo: marca como superseded
+            # e avisa que precisa rodar de novo (não re-executa sob demanda).
+            reviewer_versions = dict(versions.get("reviewer", {}))
+            reviewer_superseded_list = list(reviewer_versions.get("superseded", []) or [])
+            if reviewer_versions.get("current") is not None:
+                reviewer_superseded_list.append(str(reviewer_versions.get("current")))
+            reviewer_versions["superseded"] = reviewer_superseded_list
+            versions["reviewer"] = reviewer_versions
+            reviewer_superseded = True
+
+        meta["artifact_versions"] = versions
+        card.meta = meta
+        await self._session.commit()
+        await self._session.refresh(card)
+        # A revisão NÃO avança o card (invariante do Conductor).
+        self._publish_card_updated(card)
+
+        narrative = (
+            f"{'Plano' if agent_name == 'planner' else 'Código'} revisado "
+            f"({revisions + 1}ª versão). O card permanece em '{card.column}'."
+        )
+        if reviewer_superseded:
+            narrative += (
+                " O Reviewer foi executado com o plano anterior e agora está "
+                "desatualizado — rode o Reviewer de novo para validar a nova versão."
+            )
+
+        return {
+            "tool": TOOL_REVISE_ARTIFACT,
+            "input": user_input or {},
+            "output": {
+                "revision_created": True,
+                "revisions": revisions + 1,
+                "reviewer_superseded": reviewer_superseded,
+                "column": card.column,
+            },
+            "narrative": narrative,
+            "card": card,
+        }
 
     # ------------------------------------------------------------------
     # Persistência de estado e artifacts

@@ -25,11 +25,17 @@ logger = get_logger("pipeline_helpers")
 async def latest_artifact_content(
     session: AsyncSession, card_id, agent_name: str
 ) -> str | None:
-    """Retorna o conteúdo do artifact mais recente de um agente para o card."""
+    """Retorna o conteúdo do artifact mais recente de um agente para o card.
+
+    Ordena por `created_at DESC, id DESC` — o id é uuid4 (não ordenável no
+    tempo), então `created_at` é a chave primária, com o id como desempate
+    estável. Evita pegar um artifact mais antigo quando os UUIDs não são
+    cronologicamente ordenáveis (mesmo bug corrigido em _recent_messages).
+    """
     stmt = (
         select(Artifact.content)
         .where(Artifact.card_id == card_id, Artifact.agent_name == agent_name)
-        .order_by(Artifact.id.desc())
+        .order_by(Artifact.created_at.desc(), Artifact.id.desc())
         .limit(1)
     )
     result = await session.execute(stmt)

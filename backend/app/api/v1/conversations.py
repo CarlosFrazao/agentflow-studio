@@ -36,12 +36,55 @@ from app.services.deps import (
     get_llm,
     get_sandbox,
     get_sra,
+    set_service_overrides,
 )
+from app.core.config import get_settings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 logger = get_logger("conversations_endpoint")
+
+
+class _ReviseLLM:
+    """LLM fake de validação E2E (apenas debug): força revise_artifact.
+
+    Quando o prompt indica uma MUDANÇA (troca/muda/Postgres/stack/etc.),
+    devolve tool_calls=[revise_artifact] para exercitar a FEAT-008 de ponta
+    a ponta sem depender do LLM real (que poderia preferir run_planner).
+    Para qualquer outra mensagem, devolve tool_calls vazio (fallback
+    determinístico por coluna).
+    """
+
+    async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        lowered = user_prompt.lower()
+        if any(k in lowered for k in ("troca", "muda", "postgres", "stack", "revise")):
+            return {
+                "narrative": "Vou revisar o plano com a mudança solicitada.",
+                "tool_calls": [
+                    {"tool": "revise_artifact", "input": {"agent_name": "planner"}}
+                ],
+            }
+        return {"narrative": "", "tool_calls": []}
+
+    async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+        return "narrativa fake"
+
+
+@router.post("/_override_llm", response_model=None)
+async def override_llm(
+    request: Request, request_id: str = Depends(get_request_id)
+) -> dict:
+    """Override de LLM para validação E2E (FEAT-008). Só em debug.
+
+    Injeta um LLM fake que força revise_artifact em pedidos de mudança,
+    tornando o E2E determinístico sem dependência do LLM real. Não exposto
+    em produção (settings.debug=False).
+    """
+    if not get_settings().debug:
+        raise NotFoundError("Endpoint", "_override_llm (debug only)")
+    set_service_overrides(request, llm=_ReviseLLM())
+    return success_envelope(data={"overridden": True}, request_id=request_id)
 
 
 def _to_conversation_response(c: Conversation) -> ConversationResponse:
