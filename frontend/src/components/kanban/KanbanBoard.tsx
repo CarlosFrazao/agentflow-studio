@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { COLUMN_LABELS, COLUMN_ORDER, type Card, type KanbanColumn, type CardMeta } from "../../types/card";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { COLUMN_LABELS, COLUMN_ORDER, type KanbanColumn } from "../../types/card";
 import {
   ensureProject,
   listCards,
   moveCard,
   seedPlan,
 } from "../../api/client";
+import { connectShareWs, type ShareWsHandle } from "../../api/shareWs";
 import { KanbanCard } from "./KanbanCard";
 import { CardModal } from "./CardModal";
 import { toast } from "../../store/useToastStore";
-
-type Status = "loading" | "error" | "ready";
+import { useBoardStore, selectFilteredCards } from "../../store/useBoardStore";
 
 const PHASES = ["fase0", "fase1", "fase2", "fase3", "fase35"];
 const PHASE_LABEL: Record<string, string> = {
@@ -31,56 +31,67 @@ const COLUMN_COLOR: Record<KanbanColumn, string> = {
 };
 
 export function KanbanBoard() {
-  const [cards, setCards] = useState<Card[]>([]);
-  const [status, setStatus] = useState<Status>("loading");
-  const [error, setError] = useState<string>("");
-  const [activeProject, setActiveProject] = useState<string | undefined>();
+  // Estado derivado do servidor vive no useBoardStore (fonte única de verdade).
+  // O WS (card.updated) atualiza o store em tempo real; o board apenas lê.
+  const cards = useBoardStore((s) => s.cards);
+  const setStoreCards = useBoardStore((s) => s.setCards);
+  const filters = useBoardStore((s) => s.filters);
+  const setFilter = useBoardStore((s) => s.setFilter);
+  const resetFilters = useBoardStore((s) => s.resetFilters);
+  const moveOptimistic = useBoardStore((s) => s.moveOptimistic);
+  const replaceCard = useBoardStore((s) => s.replaceCard);
+
+  const [loadError, setLoadError] = useState<string>("");
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<
+    "idle" | "connecting" | "open" | "closed"
+  >("idle");
   const [modalCardId, setModalCardId] = useState<string | null | undefined>(undefined);
-  const [phaseFilter, setPhaseFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [search, setSearch] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropCol, setDropCol] = useState<KanbanColumn | null>(null);
 
+  const projectIdRef = useRef<string | null>(null);
+
+  // Carga inicial SÓ no mount. O WS (card.updated) mantém o store atualizado
+  // sem refresh, evitando loop de re-render entre load() e store (ADR A3).
   async function load() {
-    setStatus("loading");
     try {
-      let pid = activeProject;
-      if (!pid) {
-        pid = await ensureProject();
-        setActiveProject(pid);
-        const existing = await listCards({ projectId: pid });
-        if (existing.length === 0) {
-          await seedPlan(pid);
-        }
+      const pid = await ensureProject();
+      projectIdRef.current = pid;
+      const existing = await listCards({ projectId: pid });
+      if (existing.length === 0) {
+        await seedPlan(pid);
       }
       const data = await listCards({ projectId: pid });
-      setCards(data);
-      setStatus("ready");
+      setStoreCards(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro desconhecido");
-      setStatus("error");
+      setLoadError(e instanceof Error ? e.message : "Erro desconhecido");
+    } finally {
+      setInitialLoading(false);
     }
   }
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProject]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return cards.filter((c) => {
-      const meta = (c.meta || {}) as CardMeta;
-      if (phaseFilter && meta.phase !== phaseFilter) return false;
-      if (priorityFilter && meta.priority !== priorityFilter) return false;
-      if (q) {
-        const hay = `${meta.code ?? ""} ${c.title}`.toLowerCase();
-        if (!hay.includes(q)) return false;
+    let ws: ShareWsHandle | null = null;
+    let cancelled = false;
+    (async () => {
+      await load();
+      const pid = projectIdRef.current;
+      if (pid && !cancelled) {
+        ws = connectShareWs(pid, { onStatus: (s) => setConnectionStatus(s) });
       }
-      return true;
-    });
-  }, [cards, phaseFilter, priorityFilter, search]);
+    })();
+    return () => {
+      cancelled = true;
+      ws?.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = useMemo(
+    () => selectFilteredCards(cards, filters),
+    [cards, filters],
+  );
 
   async function handleDrop(col: KanbanColumn) {
     setDropCol(null);
@@ -89,11 +100,13 @@ export function KanbanBoard() {
     if (!id) return;
     const card = cards.find((c) => c.id === id);
     if (!card || card.column === col) return;
+    // Atualização otimista via store; rollback reaplica o estado do servidor se falhar.
+    moveOptimistic(id, col);
     try {
       await moveCard(id, col);
       toast.info("Card movido", `${card.meta?.code ?? id} → ${COLUMN_LABELS[col]}`);
-      await load();
     } catch (e) {
+      replaceCard(card);
       toast.error("Erro ao mover", e instanceof Error ? e.message : undefined);
     }
   }
@@ -101,7 +114,7 @@ export function KanbanBoard() {
   const btnPrimary =
     "inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[13px] font-semibold text-[#06121a] transition-[filter] [background:linear-gradient(135deg,var(--accent),var(--accent-2))] hover:brightness-110";
 
-  if (status === "loading") {
+  if (initialLoading) {
     return (
       <div className="flex h-40 items-center justify-center text-[var(--muted)]" role="status" aria-live="polite">
         Carregando board…
@@ -109,11 +122,11 @@ export function KanbanBoard() {
     );
   }
 
-  if (status === "error") {
+  if (loadError) {
     return (
       <div className="rounded-[14px] border border-[var(--danger)] bg-[var(--danger-bg)] p-4 text-[var(--danger)]" role="alert">
         <p className="font-medium">Falha ao carregar o board.</p>
-        <p className="text-sm">{error}</p>
+        <p className="text-sm">{loadError}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -130,8 +143,8 @@ export function KanbanBoard() {
       {/* Toolbar de filtros */}
       <div className="mb-[18px] flex flex-wrap items-center gap-[10px]">
         <select
-          value={phaseFilter}
-          onChange={(e) => setPhaseFilter(e.target.value)}
+          value={filters.phase}
+          onChange={(e) => setFilter("phase", e.target.value)}
           aria-label="Filtrar por fase"
           className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
         >
@@ -143,22 +156,47 @@ export function KanbanBoard() {
           ))}
         </select>
         <select
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
+          value={filters.priority}
+          onChange={(e) => setFilter("priority", e.target.value as "" | "P0" | "P1" | "P2")}
           aria-label="Filtrar por prioridade"
           className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
         >
           <option value="">Todas prioridades</option>
           <option value="P0">P0</option>
           <option value="P1">P1</option>
+          <option value="P2">P2</option>
         </select>
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={filters.search}
+          onChange={(e) => setFilter("search", e.target.value)}
           placeholder="Buscar por título ou código..."
           aria-label="Buscar cards"
           className="min-w-[200px] flex-1 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
         />
+        <button
+          type="button"
+          onClick={() => resetFilters()}
+          className="rounded-[10px] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[13px] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-3)]"
+        >
+          Limpar filtros
+        </button>
+        <span
+          title={connectionStatus === "open" ? "Tempo real conectado" : "Atualização em tempo real indisponível"}
+          className={`inline-flex items-center gap-1.5 rounded-[20px] px-2.5 py-1 text-[11px] font-medium ${
+            connectionStatus === "open"
+              ? "bg-[var(--accent-soft)] text-[var(--accent-text)]"
+              : "bg-[var(--surface-3)] text-[var(--text-2)]"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              connectionStatus === "open" ? "bg-[var(--accent)]" : "bg-[var(--muted)]"
+            }`}
+          />
+          {connectionStatus === "open" ? "Ao vivo" : "Offline"}
+        </span>
         <button onClick={() => setModalCardId(null)} className={btnPrimary}>
           + Novo card
         </button>
