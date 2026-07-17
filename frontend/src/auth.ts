@@ -1,3 +1,7 @@
+import { API_BASE } from "./lib/apiBase.ts";
+
+export { API_BASE };
+
 const TOKEN_KEY = "af_token";
 // Refresh token fica APENAS em memória (não persiste): fecha aba = perde sessão.
 // Reduz superfície de XSS (não vai para localStorage).
@@ -50,8 +54,6 @@ export function setSessionUser(
   setSession(access, refresh);
   localStorage.setItem(USER_ID_KEY, userId);
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
 
 interface AuthResult {
   access_token: string;

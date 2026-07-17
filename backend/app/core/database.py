@@ -79,7 +79,8 @@ async def init_db() -> None:
         # sem bloquear o loop da aplicação.
         asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=1) as executor:
-            await asyncio.get_event_loop().run_in_executor(
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
                 executor, lambda: command.upgrade(cfg, "head")
             )
     except RuntimeError:

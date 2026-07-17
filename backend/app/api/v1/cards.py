@@ -1,6 +1,7 @@
 """API de Cards (Kanban) — CRUD + movimentação de coluna com envelope padronizado."""
 
 from uuid import UUID
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy import func, select
@@ -23,6 +24,24 @@ from app.services.orchestrator import revert_auto_approval
 from app.services.prompt_hydration import hydrate_prompt
 
 router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+def _deep_merge_meta(base: dict, incoming: dict) -> dict:
+    """Recursively merge ``incoming`` into ``base``, preserving nested sub-keys.
+
+    Unlike ``dict.update``, nested dicts are merged key-by-key so a partial
+    update (e.g. ``{"review_logs": {"x": 1}}``) does not clobber sibling keys
+    already present in ``base``. Lists and scalars are replaced wholesale.
+    """
+    result: dict[str, Any] = dict(base)
+    for key, value in incoming.items():
+        existing = result.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            result[key] = _deep_merge_meta(existing, value)
+        else:
+            result[key] = value
+    return result
+
 
 
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
@@ -141,9 +160,7 @@ async def update_card(
     if body.approval_by is not None:
         card.approval_by = body.approval_by
     if body.meta is not None:
-        merged = dict(card.meta or {})
-        merged.update(body.meta)
-        card.meta = merged
+        card.meta = _deep_merge_meta(card.meta or {}, body.meta)
     await session.commit()
     await session.refresh(card)
     return success_envelope(

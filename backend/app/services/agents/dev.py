@@ -72,7 +72,7 @@ class DevAgent:
                 # Tarefa B (D2): registra a falha de geração na memória de
                 # aprendizado (gravação síncrona em thread separada, fail-open).
                 try:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     loop.run_in_executor(
                         None,
                         LearningMemory().record_lesson,
@@ -97,7 +97,7 @@ class DevAgent:
         # Esgotou tentativas: entrega com aviso (PRD F-006)
         # Tarefa B (D2): registra a falha de sandbox na memória de aprendizado.
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             loop.run_in_executor(
                 None,
                 LearningMemory().record_lesson,

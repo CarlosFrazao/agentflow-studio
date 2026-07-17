@@ -37,7 +37,7 @@ class ResearchAgent:
             # Tarefa B (D2): registra a indisponibilidade na memória de
             # aprendizado (gravação síncrona em thread separada, fail-open).
             try:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 loop.run_in_executor(
                     None,
                     LearningMemory().record_lesson,

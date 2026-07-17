@@ -1,6 +1,9 @@
 import type { Card, KanbanColumn } from "../types/card";
 import { useBoardStore } from "../store/useBoardStore";
 import { getToken } from "../auth";
+import { API_BASE } from "../lib/apiBase.ts";
+
+export { API_BASE };
 
 /**
  * Compartilhamento em tempo real via WebSocket (share_ws do backend).
@@ -12,9 +15,8 @@ import { getToken } from "../auth";
  */
 
 function wsBaseFromApi(): string {
-  const api = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
   // http(s)://host/api/v1 -> ws(s)://host/api/v1
-  return api.replace(/^http/, "ws");
+  return API_BASE.replace(/^http/, "ws");
 }
 
 export interface ShareWsHandle {

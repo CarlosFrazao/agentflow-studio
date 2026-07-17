@@ -1,7 +1,8 @@
 import type { Card, CardMeta, KanbanColumn, PaginatedCards } from "../types/card";
 import { getToken, getRefreshToken, refreshAccessToken, clearToken } from "../auth";
+import { API_BASE } from "../lib/apiBase.ts";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
+export { API_BASE };
 
 const SESSION_EXPIRED_EVENT = "af:session-expired";
 
