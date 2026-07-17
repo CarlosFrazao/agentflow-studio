@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 import pytest
 
+import app.services.llm as llm_mod
 from app.core.config import get_settings
 from app.services.llm import (
     LLMClient,
@@ -135,14 +136,36 @@ async def test_ollama_generate_text_returns_content() -> None:
     assert out == "resp"
 
 
-async def test_get_llm_client_returns_first_in_chain(monkeypatch) -> None:
+async def test_get_llm_client_returns_fallback_wrapper(monkeypatch) -> None:
+    """FEAT-002: get_llm_client() deve retornar o wrapper com fallback,
+    não o primeiro cliente da cadeia diretamente (para que o pipeline use
+    call_with_fallback e nao quebre em falha de provedor)."""
     settings = get_settings()
     monkeypatch.setattr(settings, "openrouter_api_key", "or-key")
     monkeypatch.setattr(settings, "groq_api_key", None)
     monkeypatch.setattr(settings, "gemini_api_key", None)
     monkeypatch.setattr(settings, "ollama_base_url", None)
     client = await get_llm_client()
-    assert isinstance(client, OpenRouterClient)
+    # E o wrapper (assinatura LLMClient preservada), nao OpenRouterClient.
+    assert isinstance(client, LLMClient)
+    assert not isinstance(client, OpenRouterClient)
+    assert isinstance(client, llm_mod._FallbackLLMClient)
+
+
+async def test_get_llm_client_signature_preserved(monkeypatch) -> None:
+    """FEAT-002 Edge: a assinatura pública de get_llm_client é mantida
+    (deps.py continua funcionando)."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "openrouter_api_key", "or-key")
+    monkeypatch.setattr(settings, "groq_api_key", None)
+    monkeypatch.setattr(settings, "gemini_api_key", None)
+    monkeypatch.setattr(settings, "ollama_base_url", None)
+    import inspect
+
+    client = await get_llm_client()
+    assert isinstance(client, LLMClient)
+    sig = inspect.signature(get_llm_client)
+    assert list(sig.parameters) == []
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +251,54 @@ async def test_get_llm_client_raises_when_empty(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ollama_base_url", None)
     with pytest.raises(LLMError):
         await get_llm_client()
+
+
+async def test_fallback_wrapper_uses_call_with_fallback(monkeypatch) -> None:
+    """FEAT-002 Happy: o wrapper repassa generate_text/generate_json
+    para call_with_fallback (cadeia multi-provider)."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "openrouter_api_key", "or-key")
+    monkeypatch.setattr(settings, "groq_api_key", None)
+    monkeypatch.setattr(settings, "gemini_api_key", None)
+    monkeypatch.setattr(settings, "ollama_base_url", None)
+
+    calls = []
+
+    async def fake_fallback(system_prompt, user_prompt, json_mode=False):
+        calls.append((system_prompt, user_prompt, json_mode))
+        if json_mode:
+            return {"ok": True}
+        return "texto"
+
+    monkeypatch.setattr(llm_mod, "call_with_fallback", fake_fallback)
+
+    client = await get_llm_client()
+    txt = await client.generate_text(system_prompt="s", user_prompt="u")
+    js = await client.generate_json(system_prompt="s2", user_prompt="u2")
+
+    assert txt == "texto"
+    assert js == {"ok": True}
+    assert calls[0] == ("s", "u", False)
+    assert calls[1] == ("s2", "u2", True)
+
+
+async def test_fallback_wrapper_propagates_error(monkeypatch) -> None:
+    """FEAT-002 Sad: erro de call_with_fallback (todos providers falham)
+    é propagado, não silenciado."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "openrouter_api_key", "or-key")
+    monkeypatch.setattr(settings, "groq_api_key", None)
+    monkeypatch.setattr(settings, "gemini_api_key", None)
+    monkeypatch.setattr(settings, "ollama_base_url", None)
+
+    async def fake_fallback(system_prompt, user_prompt, json_mode=False):
+        raise LLMError("all providers down")
+
+    monkeypatch.setattr(llm_mod, "call_with_fallback", fake_fallback)
+
+    client = await get_llm_client()
+    with pytest.raises(LLMError):
+        await client.generate_text(system_prompt="s", user_prompt="u")
 
 
 async def test_call_with_fallback_returns_first_success() -> None:

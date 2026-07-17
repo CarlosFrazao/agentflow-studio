@@ -430,12 +430,41 @@ def build_llm_chain() -> list[LLMClient]:
     return chain
 
 
+class _FallbackLLMClient(LLMClient):
+    """Adapter que roteia generate_json/generate_text pela cadeia de fallback.
+
+    Garante que uma falha/quota de um provedor (ex.: 429 do Gemini free tier)
+    não derruba o pipeline: ele cai para o próximo disponível da cadeia
+    montada por `build_llm_chain` (Groq -> Gemini -> OpenRouter -> Ollama).
+
+    Preserva a assinatura pública de `get_llm_client()` (-> LLMClient) para
+    não quebrar `deps.py` nem os agentes que consomem o cliente diretamente.
+    """
+
+    async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        return await call_with_fallback(
+            system_prompt, user_prompt, json_mode=True
+        )
+
+    async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
+        return await call_with_fallback(
+            system_prompt, user_prompt, json_mode=False
+        )
+
+
 async def get_llm_client() -> LLMClient:
-    """Retorna o primeiro cliente saudável da cadeia (lazy, só valida na chamada)."""
+    """Retorna um cliente com fallback automático entre os provedores.
+
+    Lazy: só valida a cadeia na chamada. Levanta `LLMError` se nenhum
+    provedor estiver configurado (sem chave/URL).
+    """
     chain = build_llm_chain()
     if not chain:
-        raise LLMError("Nenhum provedor LLM configurado. Defina ao menos uma API key (OpenRouter, Groq, Gemini) ou Ollama.")
-    return chain[0]
+        raise LLMError(
+            "Nenhum provedor LLM configurado. Defina ao menos uma API key "
+            "(OpenRouter, Groq, Gemini) ou Ollama."
+        )
+    return _FallbackLLMClient()
 
 
 def build_aux_llm_chain() -> list[LLMClient]:
