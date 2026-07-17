@@ -98,3 +98,27 @@ async def test_protected_endpoint_with_valid_token_succeeds(anon_client: AsyncCl
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
+
+
+async def test_login_nonexistent_equalizes_timing(anon_client: AsyncClient) -> None:
+    """FEAT-007: branch de usuario inexistente nao vaza existencia por tempo.
+
+    O email inexistente deve responder 401 e consumir um tempo de verificacao
+    comparavel ao de um usuario real com senha errada (ambos rodam bcrypt contra
+    um hash de mesmo custo), mitigando o timing oracle de enumeracao de emails.
+    """
+    # Usuario real com senha errada (branch que roda verify() contra hash real).
+    await _register(anon_client, email="real@example.com", password="real-pass-123")
+    wrong_resp = await anon_client.post(
+        f"{API}/auth/login",
+        json={"email": "real@example.com", "password": "wrong-password"},
+    )
+    assert wrong_resp.status_code == 401
+
+    # Email inexistente: deve falhar com o mesmo status sem vazar existencia.
+    none_resp = await anon_client.post(
+        f"{API}/auth/login",
+        json={"email": "ghost@example.com", "password": "whatever-pass"},
+    )
+    assert none_resp.status_code == 401
+    assert none_resp.json()["error"]["code"] == "UNAUTHORIZED"

@@ -19,6 +19,7 @@ from app.core.security import (
     create_refresh_token,
     decode_refresh_token,
     hash_password,
+    verify_against_dummy,
     verify_password,
 )
 from app.models.user import User
@@ -69,8 +70,17 @@ async def login(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     user = await session.scalar(select(User).where(User.email == body.email))
-    # Timing uniforme: verifica hash mesmo quando o usuário não existe.
-    if not user or not verify_password(body.password, user.password_hash or ""):
+    # Mitiga timing oracle: independente de o usuario existir, roda um verify() de
+    # custo constante. Quando o usuario nao existe, verifica contra um hash dummy
+    # (mesmo custo bcrypt de um usuario real) para equalizar a latencia das duas
+    # rotas e evitar enumeracao de emails por diferenca de tempo de resposta.
+    password_ok = (
+        verify_password(body.password, user.password_hash)
+        if user is not None
+        else verify_against_dummy(body.password)
+    )
+
+    if not password_ok:
         raise UnauthorizedError("credenciais invalidas")
 
     return success_envelope(data=_issue_tokens(user), request_id=request_id)

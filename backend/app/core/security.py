@@ -18,6 +18,14 @@ settings = get_settings()
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Dummy bcrypt hash constante usado para equalizar o tempo de verificacao quando
+# o usuario nao existe (mitiga timing oracle de enumeracao de emails em /auth/login).
+# Gerado com um segredo aleatorio descartavel; existe apenas para consumir o mesmo
+# tempo de CPU de um verify() real, nunca e comparado com senha valida.
+_DUMMY_PASSWORD_HASH = (
+    "$2b$12$05gdANFgsm0SSzlaKBsbxuo.XrWP3bPYKbd/ZtVtOYElPZyiG7LlK"
+)
+
 
 def hash_password(password: str) -> str:
     """Gera o hash bcrypt da senha (nunca armazene a senha em texto puro)."""
@@ -29,6 +37,16 @@ def verify_password(password: str, password_hash: str) -> bool:
     if not password_hash:
         return False
     return _pwd_context.verify(password, password_hash)
+
+
+def verify_against_dummy(password: str) -> bool:
+    """Consome o mesmo tempo de CPU de um verify() real contra um hash dummy.
+
+    Usado em /auth/login quando o usuario nao existe, para equalizar a latencia
+    com o branch de usuario existente e mitigar timing oracle de enumeracao.
+    Retorna sempre False (o dummy nunca casa com a senha informada).
+    """
+    return _pwd_context.verify(password, _DUMMY_PASSWORD_HASH)
 
 
 def create_access_token(subject: str | UUID, ttl_minutes: int | None = None) -> str:
