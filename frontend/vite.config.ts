@@ -9,6 +9,12 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        // Habilita tunelamento de WebSocket (ex.: /api/v1/share/{id}/ws do
+        // recurso de compartilhamento em tempo real). Sem `ws: true` o Vite
+        // não faz o upgrade e o backend responde 200 em vez de 101, quebrando
+        // a conexão WS no dev server.
+        ws: true,
+        secure: false,
       },
     },
   },

@@ -14,6 +14,10 @@ venv/
 backend/.coverage
 .pytest_cache/
 htmlcov/
+# Pytest/junit artifacts gerados durante validação (não são código-fonte)
+backend/junit*.xml
+backend/pytest_*.txt
+backend/pytest_result*.txt
 
 # Runtime data (SQLite database is created on startup)
 data/
