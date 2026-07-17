@@ -10,6 +10,8 @@ Firecrawl (scrape de docs/blogs fora do GitHub). Se o Firecrawl cair, degrada
 para só-GitHub (card informa limitação) — não trava o pipeline.
 """
 
+import re
+
 from pydantic import BaseModel, Field
 
 from app.clients.mcp.firecrawl_client import FirecrawlUnavailableError
@@ -18,7 +20,22 @@ from app.services.learning_memory import LearningMemory
 
 logger = get_logger("code_research_agent")
 
-_COPYLEFT = {"GPL", "AGPL"}
+# Copyleft families matched by word boundary to avoid false positives on
+# loose mentions (e.g. "faster than GPL-based tools" in a comparison).
+_COPYLEFT = {"GPL", "AGPL", "LGPL"}
+_COPYLEFT_RE = re.compile(r"\b(?:GPL|AGPL|LGPL)\b")
+# Full-name headers that confirm a real copyleft license.
+_COPYLEFT_HEADER_RE = re.compile(
+    r"(GENERAL PUBLIC LICENSE|LESSER GENERAL PUBLIC LICENSE|AFFERO GENERAL PUBLIC LICENSE)"
+)
+# License-context terms that must appear near the acronym to confirm a real
+# copyleft license (not a passing mention elsewhere in the text).
+_LICENSE_CONTEXT_RE = re.compile(
+    r"(?:LICENSE|LICENCE|SPDX|VERSION|\bV\d)", re.IGNORECASE
+)
+# Window (chars) around the acronym within which a license-context term must
+# appear to count as a real copyleft declaration.
+_LICENSE_CONTEXT_WINDOW = 40
 
 _CODE_RESEARCH_SYSTEM = (
     "Voce e o Code Research Agent. Dado README + estrutura + licenca de repos "
@@ -144,9 +161,24 @@ class CodeResearchAgent:
 
     @staticmethod
     def _classify_license(text: str) -> str:
+        """Classify license as copyleft / permissive / unknown.
+
+        FEAT-005: copyleft detected via word-boundary regex over normalized
+        text, so a loose mention of "GPL" in a comparison is not a false
+        positive, while real `GPL`/`AGPL`/`LGPL` tokens are.
+        """
         upper = text.upper()
-        if "GNU GENERAL PUBLIC LICENSE" in upper or "GPL" in upper or "AGPL" in upper:
+        # Real copyleft: full-name header, or the acronym with a license
+        # context term nearby (e.g. "GPL-3.0", "GPL version 2"). A loose
+        # mention like "faster than GPL-based tools" has no nearby context
+        # -> not copyleft.
+        if _COPYLEFT_HEADER_RE.search(upper):
             return "copyleft"
+        for match in _COPYLEFT_RE.finditer(upper):
+            start, end = match.start(), match.end()
+            window = text[max(0, start - _LICENSE_CONTEXT_WINDOW): end + _LICENSE_CONTEXT_WINDOW]
+            if _LICENSE_CONTEXT_RE.search(window):
+                return "copyleft"
         if any(k in upper for k in ("MIT", "APACHE", "BSD")):
             return "permissive"
         return "unknown"
