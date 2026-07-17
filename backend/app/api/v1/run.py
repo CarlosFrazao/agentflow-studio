@@ -145,7 +145,11 @@ async def run_card(
     else:
         card.column = next_column(card.column)
 
-    card.confidence_score = confidence
+    # ADR A4 (FEAT-004): only overwrite confidence when the dispatched agent
+    # returns a positive signal. Agents like planner/dev return 0.0 (no
+    # confidence of their own), which must NOT zero out the Reviewer's score.
+    if confidence > 0:
+        card.confidence_score = confidence
 
     # Reviewer reprovado: anexa logs de erro ao meta do card.
     review_logs = dispatch_result.get("review_logs")
