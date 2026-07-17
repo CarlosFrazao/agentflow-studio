@@ -9,11 +9,15 @@ URLs de integração (validadas pelo usuário em 2026-07-11):
 - Timeout de chamada MCP ao SRA: 90s (corrige os 45s do PRD v1.1)
 """
 
+import logging
+import secrets
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -120,8 +124,10 @@ class Settings(BaseSettings):
     aws_sandbox_function: str = "agentflow-sandbox"
 
     # --- Autenticação JWT (v1.2 — hardening do MVP single-tenant) ---
-    # Em produção, defina JWT_SECRET via env (nunca deixe o default em produção).
-    jwt_secret: str = "dev-insecure-change-me"
+    # Em produção, JWT_SECRET DEVE ser definido via env (fail-closed: app não sobe).
+    # Em dev (is_production=False), um secret efêmero é gerado por processo se ausente.
+    # Nunca versionar um secret conhecido — remover qualquer default inseguro.
+    jwt_secret: str | None = None
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = Field(default=60, gt=0)
     refresh_token_ttl_days: int = Field(default=30, gt=0)
@@ -147,6 +153,31 @@ class Settings(BaseSettings):
     agents_dir: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parents[3] / ".claude" / "skills"
     )
+
+    @model_validator(mode="after")
+    def _resolve_jwt_secret(self) -> "Settings":
+        """Fail-closed em produção; secret efêmero em dev.
+
+        - Produção sem JWT_SECRET -> ValueError (app recusa subir).
+        - Secret vazio ("") é tratado como ausente (igual a None).
+        - Dev sem secret -> gera secrets.token_urlsafe(32) efêmero (não persistido).
+        """
+        secret = self.jwt_secret
+        if secret is not None and secret.strip() == "":
+            secret = None
+            self.jwt_secret = None
+        if secret is None:
+            if self.is_production:
+                raise ValueError(
+                    "JWT_SECRET must be set in production "
+                    "(refusing to boot with an empty/insecure secret)."
+                )
+            self.jwt_secret = secrets.token_urlsafe(32)
+            logger.warning(
+                "JWT_SECRET not set in development: generated an ephemeral secret "
+                "for this process only (not persisted). Set JWT_SECRET to keep tokens stable."
+            )
+        return self
 
 
 @lru_cache
