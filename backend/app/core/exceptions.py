@@ -55,3 +55,15 @@ class UnauthorizedError(AppError):
 class ForbiddenError(AppError):
     code = "FORBIDDEN"
     http_status = 403
+
+
+class ApprovalWindowExpiredError(AppError):
+    """Tentativa de reverter auto-approve fora da janela (FEAT-009)."""
+
+    code = "APPROVAL_WINDOW_EXPIRED"
+    http_status = 400
+
+    def __init__(self) -> None:
+        super().__init__(
+            "janela de reversao de auto-approve expirou (ou card nao auto-aprovado)"
+        )

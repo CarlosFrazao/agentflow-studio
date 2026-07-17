@@ -7,7 +7,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import (
+    ApprovalWindowExpiredError,
+    NotFoundError,
+    ValidationError,
+)
 from app.api.v1.deps import get_current_user, get_owned_card, get_request_id
 from app.core.responses import paginated_envelope, success_envelope
 from app.models.card import KANBAN_COLUMNS, Card
@@ -15,6 +19,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.schemas.card import CardCreate, CardResponse, CardUpdate
 from app.services.event_bus import Event, event_bus
+from app.services.orchestrator import revert_auto_approval
 from app.services.prompt_hydration import hydrate_prompt
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -45,6 +50,10 @@ async def create_card(
         title=body.title,
         column=body.column,
         order_index=body.order_index,
+        confidence_score=body.confidence_score,
+        approval_by=body.approval_by,
+        auto_approved=body.auto_approved,
+        revert_deadline=body.revert_deadline,
         meta=meta,
     )
     session.add(card)
@@ -150,3 +159,53 @@ async def delete_card(
 ) -> None:
     await session.delete(card)
     await session.commit()
+
+
+@router.post("/{card_id}/revert-approval", response_model=None)
+async def revert_approval(
+    card: Card = Depends(get_owned_card),
+    request_id: str = Depends(get_request_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Desfaz um auto-approve recente dentro da janela de reversão (FEAT-009).
+
+    - Card já manual (``auto_approved is False``): idempotente — devolve 200
+      ``{reverted: False}`` sem mover coluna nem publicar evento.
+    - Card auto-aprovado dentro da janela: o helper ``revert_auto_approval``
+      reverte, persiste, publica ``card.updated`` (WebSocket, tempo real) e
+      devolve 200 ``{reverted: True}``.
+    - Card auto-aprovado fora da janela: helper retorna False -> 400
+      ``APPROVAL_WINDOW_EXPIRED`` (não altera o card).
+    """
+    if not card.auto_approved:
+        return success_envelope(
+            data={"card_id": str(card.id), "reverted": False},
+            request_id=request_id,
+        )
+    reverted = revert_auto_approval(card)
+    if not reverted:
+        raise ApprovalWindowExpiredError()
+    await session.commit()
+    await session.refresh(card)
+    # Publica card.updated para o WebSocket de compartilhamento (mesmo payload
+    # que o Conductor emite — o share_ws filtra por project_id).
+    event_bus.publish(
+        Event(
+            type="card.updated",
+            payload={
+                "card_id": str(card.id),
+                "project_id": str(card.project_id),
+                "column": card.column,
+                "confidence_score": card.confidence_score,
+                "auto_approved": card.auto_approved,
+            },
+        )
+    )
+    return success_envelope(
+        data={
+            "card_id": str(card.id),
+            "reverted": True,
+            "column": card.column,
+        },
+        request_id=request_id,
+    )

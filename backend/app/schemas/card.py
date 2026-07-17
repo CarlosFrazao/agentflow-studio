@@ -13,6 +13,10 @@ class CardCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     column: str = "backlog"
     order_index: int = 0
+    confidence_score: float = 0.0
+    approval_by: str = "none"
+    auto_approved: bool = False
+    revert_deadline: datetime | None = None
     meta: dict = Field(default_factory=dict)
 
     @field_validator("column")
