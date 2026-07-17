@@ -42,9 +42,21 @@ class EventBus:
             self._subscribers.remove(queue)
 
     def publish(self, event: Event) -> None:
-        """Faz fan-out do evento para todos os assinantes ativos."""
+        """Faz fan-out do evento para todos os assinantes ativos.
+
+        Usa ``call_soon_threadsafe`` com o loop dono de cada ``asyncio.Queue``
+        para garantir que o ``await queue.get()`` acorde mesmo quando o
+        publicador roda em um event loop diferente do assinante (cenário
+        comum em testes com Starlette TestClient, cujo WebSocket executa em
+        loop/thread próprios). O fallback ``put_nowait`` cobre o caso em que
+        a queue não esteja bound a nenhum loop (loop=None).
+        """
         for q in list(self._subscribers):
-            q.put_nowait(event)
+            loop = getattr(q, "_loop", None)
+            if loop is not None and not loop.is_closed():
+                loop.call_soon_threadsafe(q.put_nowait, event)
+            else:
+                q.put_nowait(event)
         logger.debug("event_bus_publish", type=event.type, fans=len(self._subscribers))
 
     async def stream(self) -> AsyncGenerator[Event, None]:
