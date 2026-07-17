@@ -154,6 +154,52 @@ async def test_reversal_rate(session_factory) -> None:
     assert round(report.reversal_rate, 4) == round(1 / 3, 4)
 
 
+async def test_reversal_rate_window_filter(session_factory) -> None:
+    """Cards com review_logs FORA da janela NÃO entram na taxa (ADR A5)."""
+    ids = await _seed(session_factory)
+    async with session_factory() as s:
+        # Card reprovado ANTIGO (fora da janela de 30 dias): updated_at
+        # explícito em -60d. O _card_rates deve filtrar por updated_at >= since.
+        old = Card(
+            project_id=UUID(ids["proj_a"]),
+            title="OldReject",
+            column="production",
+            auto_approved=False,
+            meta={"review_logs": "falhou há muito tempo"},
+            updated_at=_utc(60),
+        )
+        s.add(old)
+        await s.commit()
+        # Expunge para o identity map não sobrescrever updated_at no commit.
+        s.expunge(old)
+
+        report = await InsightsEngine(s).generate(days=30)
+    # Apenas card_b (dentro da janela) tem review_logs => 1/3, não 2/4.
+    assert round(report.reversal_rate, 4) == round(1 / 3, 4)
+
+
+async def test_reversal_rate_no_full_scan(session_factory) -> None:
+    """_card_rates filtra por updated_at no SQL, não materializa todos os meta."""
+    ids = await _seed(session_factory)
+    async with session_factory() as s:
+        # Card reprovado STALE (updated_at em -90d): fora da janela de 30d,
+        # portanto NÃO deve contar na taxa de reversão.
+        stale = Card(
+            project_id=UUID(ids["proj_a"]),
+            title="StaleReject",
+            column="production",
+            meta={"review_logs": "stale"},
+            updated_at=_utc(90),
+        )
+        s.add(stale)
+        await s.commit()
+        s.expunge(stale)
+
+        report = await InsightsEngine(s).generate(days=30)
+    # 1/3 (card_b), não 2/4 (card_b + StaleReject).
+    assert round(report.reversal_rate, 4) == round(1 / 3, 4)
+
+
 async def test_spend_vs_limit_respects_budget(session_factory) -> None:
     await _seed(session_factory)
     async with session_factory() as s:

@@ -71,7 +71,7 @@ class InsightsEngine:
         cost_by_project = await self._cost_by_project(since)
         cost_by_agent = await self._cost_by_agent(since)
         avg_time = await self._avg_time_per_phase(since)
-        auto_rate, reversal_rate = await self._card_rates()
+        auto_rate, reversal_rate = await self._card_rates(since)
         spend_vs_limit = await self._spend_vs_limit()
 
         report = MetricsReport(
@@ -158,15 +158,24 @@ class InsightsEngine:
         ).all()
         return {name: round(float(avg_ms or 0.0), 4) for name, avg_ms in rows}
 
-    async def _card_rates(self) -> tuple[float, float]:
-        """Taxa de auto-approve e taxa de reversão sobre o total de cards.
+    async def _card_rates(self, since: datetime) -> tuple[float, float]:
+        """Taxa de auto-approve e taxa de reversão sobre os cards na janela.
+
+        Ambas as contagens são filtradas por ``updated_at >= since`` (ADR A5:
+        a métrica reflete apenas a janela de ``days``, sem materializar todos
+        os ``meta`` do banco — evita o scan O(N) anterior).
 
         - auto-approve: cards com ``auto_approved = True`` (persistido pelo
           fluxo /run via ``should_auto_approve``, ADR-007).
         - reversão: cards cujo ``meta`` contém ``review_logs`` (o Reviewer
           reprovou e devolveu o card para 'production' — ciclo Criação↔Revisão).
         """
-        total = await self._session.scalar(select(func.count()).select_from(Card)) or 0
+        total = (
+            await self._session.scalar(
+                select(func.count()).select_from(Card).where(Card.updated_at >= since)
+            )
+            or 0
+        )
         if total == 0:
             return 0.0, 0.0
 
@@ -175,13 +184,20 @@ class InsightsEngine:
                 select(func.count())
                 .select_from(Card)
                 .where(Card.auto_approved.is_(True))
+                .where(Card.updated_at >= since)
             )
             or 0
         )
 
         # meta é JSON; contar via presença da chave review_logs é mais portável
-        # em Python do que via operadores JSON específicos de dialeto.
-        cards_meta = (await self._session.scalars(select(Card.meta))).all()
+        # em Python do que via operadores JSON específicos de dialeto. O filtro
+        # por janela já roda no SQL (updated_at >= since), então só os cards
+        # relevantes têm o meta materializado.
+        cards_meta = (
+            await self._session.scalars(
+                select(Card.meta).where(Card.updated_at >= since)
+            )
+        ).all()
         reversal_count = sum(
             1
             for meta in cards_meta
