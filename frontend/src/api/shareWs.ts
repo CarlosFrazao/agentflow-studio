@@ -1,5 +1,6 @@
 import type { Card, KanbanColumn } from "../types/card";
 import { useBoardStore } from "../store/useBoardStore";
+import { getToken } from "../auth";
 
 /**
  * Compartilhamento em tempo real via WebSocket (share_ws do backend).
@@ -51,7 +52,14 @@ export function connectShareWs(
   } = {},
 ): ShareWsHandle {
   const { conversationId, onStatus, onAgentEvent } = options;
-  const qs = conversationId ? `?conversation_id=${encodeURIComponent(conversationId)}` : "";
+  const token = getToken();
+  const sep = conversationId || token ? "?" : "";
+  const parts: string[] = [];
+  if (conversationId) parts.push(`conversation_id=${encodeURIComponent(conversationId)}`);
+  // JWT via query param: o protocolo WebSocket não aceita header Authorization.
+  // O backend valida posse do project_id antes de aceitar a conexão (OWASP API1).
+  if (token) parts.push(`token=${encodeURIComponent(token)}`);
+  const qs = parts.length ? `${sep}${parts.join("&")}` : "";
   const url = `${wsBaseFromApi()}/share/${projectId}/ws${qs}`;
   let socket: WebSocket | null = null;
   let closed = false;

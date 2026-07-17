@@ -41,9 +41,15 @@ class Settings(BaseSettings):
     # Database (SQLite local do MVP)
     database_url: str = "sqlite+aiosqlite:///./data/agentflow.db"
 
-    # CORS (frontend React em dev)
+    # CORS (frontend React em dev + origem do próprio backend em produção,
+    # onde o SPA é servido pelo FastAPI na mesma origem da API).
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
     )
 
     @field_validator("cors_origins", mode="before")

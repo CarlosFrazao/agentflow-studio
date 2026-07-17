@@ -1,5 +1,10 @@
-fastapi>=0.110
-uvicorn[standard]>=0.27
+# Pin de versões para garantir handshake WebSocket estável em browsers reais.
+# Versões >= muito novas (fastapi 0.139 / uvicorn 0.51 / websockets 16)
+# quebram o upgrade de WebSocket no Chromium/Playwright (upgrade recusado,
+# 1006 no cliente). fastapi 0.115.6 traz starlette 0.41.x compatível.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==13.1
 sqlalchemy[asyncio]>=2.0
 alembic>=1.13
 aiosqlite>=0.19
