@@ -146,6 +146,54 @@ export async function getMetricsInsights(
   return r.data;
 }
 
+/* ---------- grafo de preferências (Fase D1 / F-010 §5) ---------- */
+export interface PreferenceGraphNode {
+  id: string;
+  label: string;
+  kind: "preference";
+  attribute: string;
+  value: string;
+  confidenceCount: number;
+  archived: boolean;
+  lastReinforcedAt: string | null;
+}
+
+export interface PreferenceGraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+  kind: "lexical" | "co_occurrence";
+}
+
+export interface PreferenceGraphStats {
+  nodes: number;
+  edges: number;
+  edges_per_node: number;
+  linked_nodes: number;
+  isolated_pct: number;
+  applied_nodes: number;
+  archived_nodes: number;
+}
+
+export interface PreferenceGraph {
+  nodes: PreferenceGraphNode[];
+  edges: PreferenceGraphEdge[];
+  stats: PreferenceGraphStats;
+}
+
+/**
+ * Consome GET /users/{userId}/preferences/graph (grafo de preferências D1).
+ * Endpoint protegido por JWT — usa o fetch auth-aware (Bearer + refresh de 401).
+ */
+export async function getPreferenceGraph(
+  userId: string,
+): Promise<PreferenceGraph> {
+  const r = await apiGet<Envelope<PreferenceGraph>>(
+    `/users/${userId}/preferences/graph`,
+  );
+  return r.data;
+}
+
 /* ---------- projects + PRD seed ---------- */
 export const DEFAULT_PROJECT_NAME = "PRD v1.1 — Pipeline Multi-Agente";
 

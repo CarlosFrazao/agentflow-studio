@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.clients.mcp.firecrawl_client import FirecrawlUnavailableError
 from app.core.logging import get_logger
+from app.services.learning_memory import LearningMemory
 
 logger = get_logger("code_research_agent")
 
@@ -96,6 +97,20 @@ class CodeResearchAgent:
             except FirecrawlUnavailableError as exc:
                 degraded = True
                 logger.warning("code_research_firecrawl_unavailable", repo=repo, error=str(exc))
+                # Tarefa B (D2): registra a indisponibilidade na memória de
+                # aprendizado (gravação síncrona em thread separada, fail-open).
+                try:
+                    import asyncio
+
+                    loop = asyncio.get_event_loop()
+                    loop.run_in_executor(
+                        None,
+                        LearningMemory().record_lesson,
+                        "code_research",
+                        f"Firecrawl indisponível: {exc}",
+                    )
+                except Exception:
+                    pass
 
         # 3) Síntese via LLM (usa só o que conseguimos coletar)
         try:

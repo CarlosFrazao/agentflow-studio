@@ -4,7 +4,11 @@ PRD F-006: após gerar, tenta executar em container efêmero (sem rede) e corrig
 até 2 tentativas. O sandbox é injetável (testável sem Docker de verdade).
 """
 
+import asyncio
+
 from pydantic import BaseModel
+
+from app.services.learning_memory import LearningMemory
 
 
 class DevOutput(BaseModel):
@@ -65,6 +69,18 @@ class DevAgent:
                         system_prompt=system, user_prompt=plan
                     )
             except Exception as exc:
+                # Tarefa B (D2): registra a falha de geração na memória de
+                # aprendizado (gravação síncrona em thread separada, fail-open).
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.run_in_executor(
+                        None,
+                        LearningMemory().record_lesson,
+                        "dev",
+                        f"falha de geracao: {exc}",
+                    )
+                except Exception:
+                    pass
                 return DevOutput(attempts=attempt, error_log=str(exc))
 
             previous_code = code
@@ -79,6 +95,17 @@ class DevAgent:
             last_error = result.stderr or "erro desconhecido"
 
         # Esgotou tentativas: entrega com aviso (PRD F-006)
+        # Tarefa B (D2): registra a falha de sandbox na memória de aprendizado.
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                None,
+                LearningMemory().record_lesson,
+                "dev",
+                f"falha de sandbox apos {self._max_attempts} tentativas: {last_error}",
+            )
+        except Exception:
+            pass
         return DevOutput(
             code=code,
             ran_in_sandbox=True,

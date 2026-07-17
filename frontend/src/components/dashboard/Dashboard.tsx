@@ -3,6 +3,7 @@ import { getDashboard, type DashboardData } from "../../api/dashboard";
 import { listProjects } from "../../api/client";
 import { CostChart } from "./CostChart";
 import { InsightsPanel } from "./InsightsPanel";
+import { PreferencesGraph } from "../preferences/PreferencesGraph";
 
 interface ProjectOption {
   id: string;
@@ -141,6 +142,8 @@ export function Dashboard() {
       </div>
 
       <InsightsPanel />
+
+      <PreferencesGraph />
 
       <div className={panel}>
         <h3 className={panelTitle}>Execuções por status</h3>

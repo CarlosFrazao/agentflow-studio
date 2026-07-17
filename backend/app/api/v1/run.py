@@ -6,6 +6,7 @@ quando confidence >= 0.85 e sem alertas críticos do Reviewer.
 """
 
 from datetime import datetime, timezone, timedelta
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
@@ -24,6 +25,7 @@ from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.responses import success_envelope
+from app.services.learning_memory import LearningMemory
 from app.models.artifact import Artifact
 from app.models.card import Card
 from app.models.execution import Execution
@@ -98,6 +100,15 @@ async def run_card(
         execution.duration_ms = int((finished - started).total_seconds() * 1000)
         await session.commit()
         logger.error("agent_failed", agent=agent_name, error=str(exc))
+        # Tarefa B (D2): registra a falha na memória de aprendizado (gravação
+        # síncrona em markdown via thread separada — não bloqueia o loop).
+        # Fail-open: nunca interrompe o pipeline se a gravação falhar.
+        try:
+            await asyncio.to_thread(
+                LearningMemory().record_lesson, agent_name, f"falha: {exc}"
+            )
+        except Exception as lesson_exc:
+            logger.warning("record_lesson_failed", error=str(lesson_exc))
         return success_envelope(
             data={"status": "failed", "agent": agent_name, "error": str(exc)},
             request_id=request_id,

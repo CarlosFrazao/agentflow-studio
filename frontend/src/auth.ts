@@ -34,6 +34,23 @@ export function setSession(access: string, refresh: string): void {
   setRefreshToken(refresh);
 }
 
+const USER_ID_KEY = "af_user_id";
+
+/** Retorna o id do usuário logado (persistido em setSessionUser), ou null. */
+export function getUserId(): string | null {
+  return localStorage.getItem(USER_ID_KEY);
+}
+
+/** Persiste o id do usuário para uso em chamadas que exigem {id}. */
+export function setSessionUser(
+  access: string,
+  refresh: string,
+  userId: string,
+): void {
+  setSession(access, refresh);
+  localStorage.setItem(USER_ID_KEY, userId);
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000/api/v1";
 
 interface AuthResult {
@@ -55,7 +72,7 @@ export async function login(
     throw new Error(resp.status === 401 ? "Credenciais inválidas" : `HTTP ${resp.status}`);
   }
   const json = (await resp.json()) as { data: AuthResult };
-  setSession(json.data.access_token, json.data.refresh_token);
+  setSessionUser(json.data.access_token, json.data.refresh_token, json.data.user.id);
   return json.data;
 }
 

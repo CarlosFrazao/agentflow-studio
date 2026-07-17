@@ -6,7 +6,10 @@ relatório vazio + flag `degraded` + aviso, sem travar o pipeline.
 
 from pydantic import BaseModel
 
+import asyncio
+
 from app.services.llm import LLMClient
+from app.services.learning_memory import LearningMemory
 
 
 class ResearchOutput(BaseModel):
@@ -30,7 +33,19 @@ class ResearchAgent:
     async def run(self, query: str, mode: str = "guerrilha") -> ResearchOutput:
         try:
             sra_report = await self._sra.research(query, mode)
-        except Exception:
+        except Exception as exc:
+            # Tarefa B (D2): registra a indisponibilidade na memória de
+            # aprendizado (gravação síncrona em thread separada, fail-open).
+            try:
+                loop = asyncio.get_event_loop()
+                loop.run_in_executor(
+                    None,
+                    LearningMemory().record_lesson,
+                    "research",
+                    f"SRA indisponível: {exc}",
+                )
+            except Exception:
+                pass
             return ResearchOutput(
                 degraded=True,
                 warning="pesquisa de mercado incompleta (SRA indisponivel)",
