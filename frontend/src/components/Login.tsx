@@ -7,8 +7,8 @@ import { login } from "../auth";
  * Centralização via grid place-items-center; formulário max-width 420px.
  */
 export function Login({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState("test@example.com");
-  const [password, setPassword] = useState("test-password-123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
