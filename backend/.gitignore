@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.venv/
 .env
 data/
 *.db
@@ -7,3 +8,4 @@ data/
 htmlcov/
 .ruff_cache/
 .mypy_cache/
+.coverage

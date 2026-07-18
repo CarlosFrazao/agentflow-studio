@@ -2,8 +2,24 @@
 
 import pytest
 from httpx import AsyncClient
+from uuid import UUID
 
 pytestmark = pytest.mark.asyncio
+
+
+async def _login_as(client: AsyncClient, user_id: str, session_factory) -> None:
+    """Sobrescreve get_current_user para o usuario informado (path e ignorado)."""
+    from app.api.v1.deps import get_current_user
+    from app.models.user import User
+
+    async with session_factory() as s:
+        db_user = await s.get(User, UUID(user_id))
+        assert db_user is not None
+
+        async def override() -> User:
+            return db_user
+
+    client._transport.app.dependency_overrides[get_current_user] = override
 
 
 async def _create_user(client: AsyncClient) -> str:
@@ -56,8 +72,11 @@ async def test_list_snippets_by_user(client: AsyncClient) -> None:
 
 
 # ---- F-010 Preferences ----
-async def test_preference_applied_only_when_confidence_ge_2(client: AsyncClient) -> None:
+async def test_preference_applied_only_when_confidence_ge_2(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     # reforca 1x -> confidence_count=1, nao aplicada
     r1 = await client.post(
         "/api/v1/users/{uid}/preferences".format(uid=uid),
@@ -75,8 +94,11 @@ async def test_preference_applied_only_when_confidence_ge_2(client: AsyncClient)
     assert r2.json()["data"]["applied"] is True
 
 
-async def test_get_preferences_returns_list(client: AsyncClient) -> None:
+async def test_get_preferences_returns_list(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     await client.post(
         "/api/v1/users/{uid}/preferences".format(uid=uid),
         json={"attribute": "lang", "value": "pt"},
@@ -87,8 +109,11 @@ async def test_get_preferences_returns_list(client: AsyncClient) -> None:
 
 
 # ---- F-011 Budget ----
-async def test_budget_defaults_and_update(client: AsyncClient) -> None:
+async def test_budget_defaults_and_update(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     resp = await client.get(f"/api/v1/users/{uid}/budget")
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -96,8 +121,11 @@ async def test_budget_defaults_and_update(client: AsyncClient) -> None:
     assert data["per_project_limit_usd"] == 3.0
 
 
-async def test_budget_warning_at_80_percent(client: AsyncClient) -> None:
+async def test_budget_warning_at_80_percent(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     await client.put(
         f"/api/v1/users/{uid}/budget",
         json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,
@@ -107,8 +135,11 @@ async def test_budget_warning_at_80_percent(client: AsyncClient) -> None:
     assert resp.json()["data"]["warning_level"] == "warning"  # 85% > 80%
 
 
-async def test_budget_blocked_at_100_percent(client: AsyncClient) -> None:
+async def test_budget_blocked_at_100_percent(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     await client.put(
         f"/api/v1/users/{uid}/budget",
         json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,

@@ -2,6 +2,11 @@
 
 Regra: só é 'applied' (usado nos prompts) quando confidence_count >= 2,
 evitando overfitting em um único evento.
+
+FEAT-001 (P0, IDOR): todas as rotas usam o usuario autenticado
+(Depends(get_current_user)) como dono. O user_id NUNCA vem do path — assim um
+usuario logado so pode ler/escrever SUAS proprias preferencias (OWASP API1:
+Broken Object Level Authorization).
 """
 
 from datetime import datetime, timezone
@@ -11,7 +16,7 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_current_user, get_request_id
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError
 from app.core.responses import success_envelope
@@ -33,19 +38,19 @@ APPLY_THRESHOLD = 2
 
 @router.post("/{user_id}/preferences", response_model=None, status_code=status.HTTP_201_CREATED)
 async def reinforce_preference(
-    user_id: UUID,
+    user_id: str,
     body: PreferenceCreate,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    if not await session.get(User, user_id):
-        raise NotFoundError("User", str(user_id))
-
+    # O user_id do path e IGNORADO por seguranca (FEAT-001): a preferencia e
+    # sempre criada para o usuario autenticado, nunca para um terceiro informado
+    # no path. Assim A POST /users/{B}/preferences cria para A (anti-IDOR).
     existing = (
         await session.scalars(
             select(UserPreference).where(
-                UserPreference.user_id == user_id,
+                UserPreference.user_id == user.id,
                 UserPreference.attribute == body.attribute,
                 UserPreference.value == body.value,
             )
@@ -59,7 +64,7 @@ async def reinforce_preference(
         pref = existing
     else:
         pref = UserPreference(
-            user_id=user_id,
+            user_id=user.id,
             attribute=body.attribute,
             value=body.value,
             confidence_count=1,
@@ -76,16 +81,15 @@ async def reinforce_preference(
 
 @router.get("/{user_id}/preferences", response_model=None)
 async def list_preferences(
-    user_id: UUID,
+    user_id: str,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    if not await session.get(User, user_id):
-        raise NotFoundError("User", str(user_id))
+    _assert_owns_path(user, user_id)
     rows = (
         await session.scalars(
-            select(UserPreference).where(UserPreference.user_id == user_id)
+            select(UserPreference).where(UserPreference.user_id == user.id)
         )
     ).all()
     items = []
@@ -101,7 +105,8 @@ async def list_preferences(
 
 @router.get("/{user_id}/preferences/graph", response_model=None)
 async def get_preference_graph(
-    user_id: UUID,
+    user_id: str,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -110,9 +115,8 @@ async def get_preference_graph(
     Exporta JSON {nodes, edges, stats} a partir da tabela ``user_preferences``
     para o frontend desenhar o grafo "Preferências Aprendidas".
     """
-    if not await session.get(User, user_id):
-        raise NotFoundError("User", str(user_id))
-    graph = await build_graph(session, user_id=user_id)
+    _assert_owns_path(user, user_id)
+    graph = await build_graph(session, user_id=user.id)
     return success_envelope(
         data=PreferenceGraphResponse(**graph).model_dump(mode="json"),
         request_id=request_id,
@@ -121,16 +125,17 @@ async def get_preference_graph(
 
 @router.patch("/{user_id}/preferences/{preference_id}", response_model=None)
 async def edit_preference(
-    user_id: UUID,
-    preference_id: UUID,
+    user_id: str,
+    preference_id: str,
     body: PreferenceEdit,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Edita o valor de uma preferência (reescreve, mantém histórico de reforço)."""
-    await _require_owner(session, user_id, preference_id)
+    pref = await _require_owner(session, user, preference_id)
     pref = await mutate_preference(
-        session, str(preference_id), "edit", value=body.value
+        session, str(pref.id), "edit", value=body.value
     )
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
@@ -139,14 +144,15 @@ async def edit_preference(
 
 @router.delete("/{user_id}/preferences/{preference_id}", response_model=None)
 async def archive_preference(
-    user_id: UUID,
-    preference_id: UUID,
+    user_id: str,
+    preference_id: str,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Remove (arquiva recuperável) uma preferência — não apaga o histórico físico."""
-    await _require_owner(session, user_id, preference_id)
-    pref = await mutate_preference(session, str(preference_id), "remove")
+    pref = await _require_owner(session, user, preference_id)
+    pref = await mutate_preference(session, str(pref.id), "remove")
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)
@@ -154,26 +160,40 @@ async def archive_preference(
 
 @router.post("/{user_id}/preferences/{preference_id}/restore", response_model=None)
 async def restore_preference(
-    user_id: UUID,
-    preference_id: UUID,
+    user_id: str,
+    preference_id: str,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Restaura uma preferência arquivada (reverte o arquivamento)."""
-    await _require_owner(session, user_id, preference_id)
-    pref = await mutate_preference(session, str(preference_id), "restore")
+    pref = await _require_owner(session, user, preference_id)
+    pref = await mutate_preference(session, str(pref.id), "restore")
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)
 
 
+def _assert_owns_path(user: User, user_id: str) -> None:
+    """O user_id do path DEVE coincidir com o usuario autenticado.
+
+    Levanta 404 (e nao 403) para nao vazar a existencia de recursos de terceiros.
+    """
+    if str(user.id) != str(user_id):
+        raise NotFoundError("User", str(user_id))
+
+
 async def _require_owner(
-    session: AsyncSession, user_id: UUID, preference_id: UUID
+    session: AsyncSession, user: User, preference_id: str
 ) -> UserPreference:
-    """Garante que a preferência existe e pertence ao user_id informado."""
-    pref = await session.get(UserPreference, preference_id)
+    """Garante que a preferência existe e pertence ao usuario autenticado."""
+    try:
+        pref_uuid = UUID(str(preference_id))
+    except (ValueError, AttributeError):
+        raise NotFoundError("UserPreference", str(preference_id))
+    pref = await session.get(UserPreference, pref_uuid)
     if pref is None:
         raise NotFoundError("UserPreference", str(preference_id))
-    if pref.user_id != user_id:
+    if pref.user_id != user.id:
         raise NotFoundError("UserPreference", str(preference_id))
     return pref
