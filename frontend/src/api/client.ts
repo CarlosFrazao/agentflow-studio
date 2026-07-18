@@ -119,6 +119,27 @@ export async function runCard(cardId: string): Promise<void> {
   await apiFetch(`/cards/${cardId}/run`, { method: "POST" });
 }
 
+export interface RevertApprovalResult {
+  card_id: string;
+  reverted: boolean;
+  column?: KanbanColumn;
+}
+
+/**
+ * Desfaz um auto-approve recente dentro da janela de reversão
+ * (POST /cards/{id}/revert-approval, FEAT-009). Erro 400 indica janela
+ * expirada; erro 401 cai no refresh de token do apiFetch.
+ */
+export async function revertApproval(
+  cardId: string,
+): Promise<RevertApprovalResult> {
+  const r = await apiSend<Envelope<RevertApprovalResult>>(
+    "POST",
+    `/cards/${cardId}/revert-approval`,
+  );
+  return r.data;
+}
+
 /* ---------- métricas / insights (Fase C1, endpoint protegido) ---------- */
 export interface MetricsInsights {
   days: number;

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.models.card import Card
 from app.models.execution import Execution
 from app.models.project import Project
+from app.models.user import User
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,9 +27,20 @@ def _utc(days_ago: int, hour: int = 12) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=days_ago, hours=24 - hour)
 
 
-async def _make_project(session_factory: async_sessionmaker, name: str) -> str:
+async def _current_user_id(client: AsyncClient) -> str:
+    """Recupera o user_id do fixture `client` (override de get_current_user)."""
+    from app.api.v1.deps import get_current_user
+
+    override = client._transport.app.dependency_overrides.get(get_current_user)
+    user = await override()
+    return str(user.id)
+
+
+async def _make_project(
+    session_factory: async_sessionmaker, name: str, user_id: str
+) -> str:
     async with session_factory() as s:
-        p = Project(name=name)
+        p = Project(name=name, user_id=UUID(user_id))
         s.add(p)
         await s.commit()
         await s.refresh(p)
@@ -69,9 +81,10 @@ async def _add_exec(
 async def _seed_two_projects(
     client: AsyncClient, session_factory: async_sessionmaker
 ) -> tuple[str, str]:
-    """Cria 2 projetos, cada um com 1 card e execuções distintas."""
-    pid_a = await _make_project(session_factory, "A")
-    pid_b = await _make_project(session_factory, "B")
+    """Cria 2 projetos do usuário autenticado, cada um com 1 card e execuções."""
+    uid = await _current_user_id(client)
+    pid_a = await _make_project(session_factory, "A", uid)
+    pid_b = await _make_project(session_factory, "B", uid)
     cid_a = await _make_card(session_factory, pid_a)
     cid_b = await _make_card(session_factory, pid_b)
 

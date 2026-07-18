@@ -172,11 +172,17 @@ class CodeResearchAgent:
         # context term nearby (e.g. "GPL-3.0", "GPL version 2"). A loose
         # mention like "faster than GPL-based tools" has no nearby context
         # -> not copyleft.
+        #
+        # The window is sliced from `upper` (the same string the regex runs
+        # on), NOT from `text`. Unicode casing can change length (e.g. the
+        # German sharp s "ß" expands to "SS" under .upper()), so indices into
+        # `upper` would be misaligned against `text` and silently miss the
+        # license-context term. Slicing the matched string keeps indices valid.
         if _COPYLEFT_HEADER_RE.search(upper):
             return "copyleft"
         for match in _COPYLEFT_RE.finditer(upper):
             start, end = match.start(), match.end()
-            window = text[max(0, start - _LICENSE_CONTEXT_WINDOW): end + _LICENSE_CONTEXT_WINDOW]
+            window = upper[max(0, start - _LICENSE_CONTEXT_WINDOW): end + _LICENSE_CONTEXT_WINDOW]
             if _LICENSE_CONTEXT_RE.search(window):
                 return "copyleft"
         if any(k in upper for k in ("MIT", "APACHE", "BSD")):

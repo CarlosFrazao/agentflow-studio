@@ -1,13 +1,11 @@
 """Dependencies comuns da API v1."""
 
 import uuid
+from uuid import UUID
 
 from fastapi import Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError, UnauthorizedError
@@ -77,12 +75,15 @@ async def get_owned_card(
 ) -> Card:
     """Devolve o Card se o Project pai pertencer ao usuário; 404 c.c.
 
-    Card não tem user_id próprio: herda do Project via project_id.
+    Card não tem user_id próprio: herda do Project via project_id. O project
+    é eager-loaded (selectinload) para que ``card.project`` já esteja populado
+    no corpo da rota sem nova query (evita N+1 em listagens).
     """
-    card = await session.get(Card, card_id)
+    stmt = select(Card).where(Card.id == card_id)
+    card = (await session.scalars(stmt)).first()
     if card is None:
         raise NotFoundError("Card", str(card_id))
-    project = await session.get(Project, card.project_id)
+    project = card.project
     if project is None or project.user_id != user.id:
         raise NotFoundError("Card", str(card_id))
     return card

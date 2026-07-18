@@ -39,27 +39,23 @@ async def test_dashboard_lists_recent_executions(client: AsyncClient) -> None:
 async def test_dashboard_spend_vs_limit_ratio(
     client: AsyncClient, session_factory
 ) -> None:
-    # O router /users (CRUD de User) foi removido no FEAT-C001 (mitiga IDOR
-    # em massa). O user e' criado via /auth/register.
     # FEAT-002: current_month_spend_usd nao e mais settable via API (anti-fraude);
-    # o gasto e semeado direto no banco, como as Executions fariam. O dashboard
-    # soma os budgets globalmente, entao criamos um unico budget controlado.
-    from uuid import UUID
-
+    # o gasto e semeado direto no banco. FEAT-008: o dashboard filtra por
+    # current_user, entao o budget deve pertencer ao usuario autenticado pelo
+    # fixture `client` (nao a um user arbitrario).
+    from app.api.v1.deps import get_current_user
     from app.models.budget import BudgetLimit
     from sqlalchemy import select
 
-    reg = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "d@ex.com", "display_name": "D", "password": "x12345678"},
-    )
-    uid = reg.json()["data"]["user"]["id"]
+    override = client._transport.app.dependency_overrides.get(get_current_user)
+    auth_user = await override()
+    uid = auth_user.id
     async with session_factory() as s:
         budget = await s.scalar(
-            select(BudgetLimit).where(BudgetLimit.user_id == UUID(uid))
+            select(BudgetLimit).where(BudgetLimit.user_id == uid)
         )
         if budget is None:
-            budget = BudgetLimit(user_id=UUID(uid))
+            budget = BudgetLimit(user_id=uid)
             s.add(budget)
         budget.monthly_limit_usd = 10.0
         budget.per_project_limit_usd = 3.0

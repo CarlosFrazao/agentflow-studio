@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import type { CardMeta, KanbanColumn } from "../../types/card";
+import type { Card, CardMeta, KanbanColumn } from "../../types/card";
 import { COLUMN_LABELS, COLUMN_ORDER } from "../../types/card";
 import {
+  apiGet,
   createCard,
   deleteCard,
   ensureProject,
   moveCard,
+  revertApproval,
   runCard,
   updateCard,
 } from "../../api/client";
@@ -37,8 +39,37 @@ export function CardModal({ cardId, onClose, onChanged }: Props) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Estado de auto-approve para o botão de reversão (só visível quando
+  // aplicável: card auto-aprovado ainda dentro da janela de reversão).
+  const [autoApproved, setAutoApproved] = useState(false);
+  const [revertDeadline, setRevertDeadline] = useState<string | null>(null);
 
   const checklist = meta.checklist ?? [];
+
+  // Carrega o card existente (inclui auto_approved/revert_deadline) ao abrir
+  // um modal de edição. O novo card não precisa buscar nada.
+  useEffect(() => {
+    if (isNew || !cardId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiGet<{ success: boolean; data: Card }>(
+          `/cards/${cardId}`,
+        );
+        if (cancelled) return;
+        const c = data.data;
+        setTitle(c.title);
+        setMeta(c.meta ?? meta);
+        setAutoApproved(c.auto_approved);
+        setRevertDeadline(c.revert_deadline);
+      } catch {
+        /* mantém estado inicial; o save/update tratam erros */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew, cardId]);
 
   // Fecha o modal com a tecla Escape (não enquanto uma ação está em andamento).
   useEffect(() => {
@@ -125,6 +156,39 @@ export function CardModal({ cardId, onClose, onChanged }: Props) {
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao excluir");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Janela de reversão ainda aberta? (deadline no futuro)
+  const canRevert =
+    !isNew &&
+    autoApproved &&
+    revertDeadline != null &&
+    new Date(revertDeadline).getTime() > Date.now();
+
+  async function revert() {
+    if (!cardId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await revertApproval(cardId);
+      if (res.reverted) {
+        toast.success(
+          "Auto-approve desfeito",
+          `${meta.code} voltou para revisão humana.`,
+        );
+        setAutoApproved(false);
+      } else {
+        toast.info("Sem alteração", "O card já estava em aprovação manual.");
+      }
+      onChanged();
+      onClose();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao desfazer aprovação";
+      // 400 = janela expirada (backend ApprovalWindowExpiredError)
+      setError(msg.includes("400") ? "Janela de reversão expirada." : msg);
     } finally {
       setBusy(false);
     }
@@ -262,14 +326,26 @@ export function CardModal({ cardId, onClose, onChanged }: Props) {
         <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
           <div>
             {!isNew && (
-              <button
-                type="button"
-                onClick={remove}
-                disabled={busy}
-                className="rounded-[10px] px-3 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-bg)] disabled:opacity-40"
-              >
-                🗑 Excluir
-              </button>
+              <>
+                {canRevert && (
+                  <button
+                    type="button"
+                    onClick={revert}
+                    disabled={busy}
+                    className="rounded-[10px] px-3 py-2 text-sm font-medium text-[var(--warn)] transition-colors hover:bg-[var(--warn-bg)] disabled:opacity-40"
+                  >
+                    ↩ Desfazer aprovação
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={remove}
+                  disabled={busy}
+                  className="rounded-[10px] px-3 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-bg)] disabled:opacity-40"
+                >
+                  🗑 Excluir
+                </button>
+              </>
             )}
           </div>
           <div className="flex gap-2">

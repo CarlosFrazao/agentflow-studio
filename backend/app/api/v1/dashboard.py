@@ -15,13 +15,14 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_current_user, get_request_id
 from app.core.database import get_session
 from app.core.responses import success_envelope
 from app.models.budget import BudgetLimit
 from app.models.card import Card
 from app.models.execution import Execution
 from app.models.project import Project
+from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -29,13 +30,21 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 COST_SERIES_DAYS = 30
 
 
-def _execution_base_query(project_id: UUID | None):
-    """Query base de Execution, opcionalmente filtrada por projeto via Card."""
-    q = select(Execution)
+def _execution_base_query(user: User, project_id: UUID | None):
+    """Query base de Execution restrita ao usuário.
+
+    Sempre filtra pelos cards dos projetos do usuário; se ``project_id`` for
+    informado, restringe ainda mais àquele projeto (drill-down). Isso evita
+    que o dashboard exponha execuções/custos de outros usuários (tenant scope).
+    """
+    q = (
+        select(Execution)
+        .join(Card, Execution.card_id == Card.id)
+        .join(Project, Card.project_id == Project.id)
+        .where(Project.user_id == user.id)
+    )
     if project_id is not None:
-        q = q.join(Card, Execution.card_id == Card.id).where(
-            Card.project_id == project_id
-        )
+        q = q.where(Card.project_id == project_id)
     return q
 
 
@@ -44,53 +53,56 @@ async def get_dashboard(
     request: Request,
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
     project_id: UUID | None = Query(default=None, description="Filtrar por projeto (drill-down)"),
 ) -> dict:
-    projects_created = await session.scalar(select(func.count()).select_from(Project)) or 0
+    # Escopo de tenant: só os recursos do usuário autenticado.
+    projects_created = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Project)
+            .where(Project.user_id == user.id)
+        )
+        or 0
+    )
     cards_done = (
         await session.scalar(
-            select(func.count()).select_from(Card).where(Card.column == "done")
+            select(func.count())
+            .select_from(Card)
+            .join(Project, Card.project_id == Project.id)
+            .where(Project.user_id == user.id, Card.column == "done")
         )
         or 0
     )
 
-    # gasto vs limite global (soma dos budgets de usuários) — SEMPRE global
+    # gasto vs limite — SOMENTE dos budgets do usuário (nunca global)
     spend_row = await session.execute(
         select(
             func.coalesce(func.sum(BudgetLimit.current_month_spend_usd), 0.0),
             func.coalesce(func.sum(BudgetLimit.monthly_limit_usd), 0.0),
-        )
+        ).where(BudgetLimit.user_id == user.id)
     )
     spent, limit = spend_row.one()
     ratio = (spent / limit) if limit else 0.0
 
-    base_exec = _execution_base_query(project_id)
-    # Fonte para agregações: subquery com join/filtro quando há project_id,
-    # senão a tabela Execution direta (evita subquery desnecessária). As
-    # colunas da subquery são acessadas via `.c` para evitar ambiguidade.
-    if project_id is not None:
-        subq = base_exec.subquery()
-        src = subq
-        c_started = subq.c.started_at
-        c_cost = subq.c.cost_usd
-        c_agent = subq.c.agent_name
-        c_status = subq.c.status
-        c_id = subq.c.id
-    else:
-        src = Execution
-        c_started = Execution.started_at
-        c_cost = Execution.cost_usd
-        c_agent = Execution.agent_name
-        c_status = Execution.status
-        c_id = Execution.id
+    base_exec = _execution_base_query(user, project_id)
+    # Fonte para agregações: subquery com join/filtro de tenant, preservando
+    # as colunas via `.c` para evitar ambiguidade.
+    subq = base_exec.subquery()
+    src = subq
+    c_started = subq.c.started_at
+    c_cost = subq.c.cost_usd
+    c_agent = subq.c.agent_name
+    c_status = subq.c.status
+    c_id = subq.c.id
 
-    # custo total (respeita filtro de projeto quando presente)
+    # custo total (respeita filtro de tenant + projeto quando presente)
     total_cost = (
         await session.scalar(select(func.coalesce(func.sum(c_cost), 0.0)).select_from(src))
         or 0.0
     )
 
-    # execuções recentes (últimas 20, respeitando filtro de projeto)
+    # execuções recentes (últimas 20, respeitando filtro de tenant/projeto)
     rows = (
         await session.scalars(
             base_exec.order_by(Execution.started_at.desc().nullslast()).limit(20)

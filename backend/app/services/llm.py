@@ -1,9 +1,10 @@
 """Cliente LLM Multi-provider com Fallback Automático.
 
-Ordem de fallback (configurável via LLM_PROVIDER e chaves disponíveis):
-1. OpenRouter (free tier)
-2. Groq (free tier)
-3. Google Gemini (free tier)
+Ordem real da cadeia de fallback (montada por build_llm_chain, respeitando
+as chaves configuradas — quality benchmark 2026-07-16):
+1. Groq (free tier, primário — maior qualidade/speed)
+2. Google Gemini (free tier)
+3. OpenRouter (free tier remoto, conta pode estar limitada)
 4. Ollama (local, sem chave)
 
 Cada provider implementa o contrato LLMClient (generate_json, generate_text).
@@ -13,6 +14,7 @@ Fallback acontece silenciosamente se falhar (rede, auth, rate-limit, etc.).
 from abc import ABC, abstractmethod
 import json
 import os
+import re
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -22,6 +24,38 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger("llm")
+
+# Some providers wrap the JSON payload in a markdown code fence
+# (e.g. ```json ... ```) or emit leading/trailing prose. This helper extracts
+# and parses the first valid JSON object so generate_json is robust to that.
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+def _coerce_json(content: str) -> dict[str, Any]:
+    """Parse provider output into a dict, tolerating markdown fences.
+
+    Raises LLMError if no valid JSON object can be extracted.
+    """
+    if not isinstance(content, str):
+        raise LLMError(f"Resposta do LLM não é texto: {type(content).__name__}")
+    stripped = content.strip()
+    # Fast path: already a bare JSON object.
+    try:
+        parsed = json.loads(stripped)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    # Slow path: pull the content out of a ```json ... ``` fence.
+    fence = _JSON_FENCE_RE.search(stripped)
+    if fence:
+        try:
+            parsed = json.loads(fence.group(1).strip())
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    raise LLMError("LLM não retornou um objeto JSON válido após fallback.")
 
 
 class LLMError(Exception):
@@ -97,7 +131,7 @@ class OpenRouterClient(LLMClient):
             response_format="json_object",
         )
         content = data["choices"][0]["message"]["content"]
-        return json.loads(content)
+        return _coerce_json(content)
 
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
         data = await self._chat(
@@ -149,7 +183,7 @@ class GroqClient(LLMClient):
             response_format="json_object",
         )
         content = data["choices"][0]["message"]["content"]
-        return json.loads(content)
+        return _coerce_json(content)
 
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
         data = await self._chat(
@@ -244,8 +278,8 @@ class GeminiClient(LLMClient):
                 contents=f"{system_prompt}\n\n{user_prompt}",
                 config={"response_mime_type": "application/json", "temperature": 0.1},
             )
-            return json.loads(response.text)
-        except Exception as exc:
+            return _coerce_json(response.text)
+        except (LLMError, Exception) as exc:
             raise LLMError(f"Gemini falhou: {exc}") from exc
 
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
@@ -319,7 +353,7 @@ class OllamaClient(LLMClient):
             response_format="json_object",
         )
         content = data.get("message", {}).get("content", "")
-        return json.loads(content)
+        return _coerce_json(content)
 
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
         data = await self._chat(

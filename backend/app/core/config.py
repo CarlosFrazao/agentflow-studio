@@ -63,6 +63,15 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    @field_validator("firecrawl_api_key", mode="before")
+    @classmethod
+    def _empty_key_to_none(cls, v: str | None) -> str | None:
+        # String vazia no .env (ou ausente) => None, não "" — assim o código
+        # trata "sem chave" de forma uniforme (self-hosted sem auth em dev).
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
+        return v
+
     # --- Integrações externas (MCP / REST) ---
     # SRA (Smart Research Agent) — MCP SSE remoto
     sra_mcp_url: str = "http://sra-app:3458/mcp/sse"
@@ -72,7 +81,7 @@ class Settings(BaseSettings):
     # Firecrawl (self-hosted) — MCP SSE com fallback REST
     firecrawl_mcp_url: str = "http://firecrawl-api-new:3002/mcp/sse"
     firecrawl_rest_url: str = "http://firecrawl-api-new:3002"
-    firecrawl_api_key: str = "local_bypass"  # placeholder aceito por instância self-hosted
+    firecrawl_api_key: str | None = None  # vazio = self-hosted sem auth (dev local)
     firecrawl_call_timeout_s: float = 30.0
 
     # GitHub API (REST direto, sem MCP)

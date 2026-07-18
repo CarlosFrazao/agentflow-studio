@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.models.card import Card
 from app.models.execution import Execution
 from app.models.project import Project
+from app.models.user import User
 
 pytestmark = pytest.mark.asyncio
 
@@ -18,9 +19,15 @@ def _utc(days_ago: int) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=days_ago)
 
 
-async def _seed(session_factory: async_sessionmaker) -> None:
+async def _seed(client: AsyncClient, session_factory: async_sessionmaker) -> None:
+    from uuid import UUID
+
+    from app.api.v1.deps import get_current_user
+
+    override = client._transport.app.dependency_overrides.get(get_current_user)
+    user = await override()
     async with session_factory() as s:
-        proj = Project(name="Alpha")
+        proj = Project(name="Alpha", user_id=UUID(str(user.id)))
         s.add(proj)
         await s.commit()
         await s.refresh(proj)
@@ -44,7 +51,7 @@ async def _seed(session_factory: async_sessionmaker) -> None:
 async def test_metrics_endpoint_returns_envelope(
     client: AsyncClient, session_factory: async_sessionmaker
 ) -> None:
-    await _seed(session_factory)
+    await _seed(client, session_factory)
     resp = await client.get("/api/v1/metrics/insights?days=30")
     assert resp.status_code == 200
     body = resp.json()
@@ -61,7 +68,7 @@ async def test_metrics_endpoint_returns_envelope(
 async def test_metrics_endpoint_default_days(
     client: AsyncClient, session_factory: async_sessionmaker
 ) -> None:
-    await _seed(session_factory)
+    await _seed(client, session_factory)
     resp = await client.get("/api/v1/metrics/insights")
     assert resp.status_code == 200
     assert resp.json()["data"]["days"] == 30
