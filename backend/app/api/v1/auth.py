@@ -70,15 +70,14 @@ async def login(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     user = await session.scalar(select(User).where(User.email == body.email))
-    # Mitiga timing oracle: independente de o usuario existir, roda um verify() de
-    # custo constante. Quando o usuario nao existe, verifica contra um hash dummy
-    # (mesmo custo bcrypt de um usuario real) para equalizar a latencia das duas
-    # rotas e evitar enumeracao de emails por diferenca de tempo de resposta.
-    password_ok = (
-        verify_password(body.password, user.password_hash)
-        if user is not None
-        else verify_against_dummy(body.password)
-    )
+    # Mitiga timing oracle de forma completa (Audit BUG-001): independente de o
+    # usuario existir, SEMPRE roda um verify() de custo constante contra o hash
+    # real (se existir) OU contra o dummy. Assim a latencia da rota de login e
+    # identica para emails validos e invalidos, impedindo enumeracao por tempo.
+    if user is not None:
+        password_ok = verify_password(body.password, user.password_hash)
+    else:
+        password_ok = verify_against_dummy(body.password)
 
     if not password_ok:
         raise UnauthorizedError("credenciais invalidas")
