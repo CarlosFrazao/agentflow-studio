@@ -1,27 +1,29 @@
 """Compartilhamento de sessão via URL (Item D do analise_omnigent.md).
 
 Expõe o board Kanban de um projeto (cards agrupados por coluna) e as
-execuções recentes em uma rota PÚBLICA, sem JWT — para que equipes
-acompanhem o progresso remoto. Opcionalmente protegida por token de
-acesso (quando o projeto define um share_token).
+execuções recentes. A rota exige JWT do proprietário do projeto
+(OWASP API1 / BOLA): um usuário só compartilha/visualiza o board dos
+projetos que ele possui. UUIDs alheios retornam 404 (sem vazar a
+existência do recurso).
 
-O WebSocket em /share/{project_id}/ws transmite atualizações em tempo real
-(ver app/api/v1/share_ws.py), alimentado pelo EventBus.
+O WebSocket em /share/{project_id}/ws segue o mesmo modelo (ver
+app/api/v1/share_ws.py), alimentado pelo EventBus.
 """
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_current_user, get_owned_project, get_request_id
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError
 from app.core.responses import success_envelope
 from app.models.card import Card
 from app.models.execution import Execution
 from app.models.project import Project
+from app.models.user import User
 
 router = APIRouter(prefix="/share", tags=["share"])
 
@@ -63,14 +65,14 @@ def build_shared_board(project_id: str, cards: list, executions: list) -> dict:
 
 @router.get("/{project_id}", response_model=None)
 async def get_shared_board(
-    project_id: UUID,
-    request: Request,
+    project: Project = Depends(get_owned_project),
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    project = await session.get(Project, project_id)
-    if not project:
-        raise NotFoundError("Project", str(project_id))
+    # `project` já é garantido como pertencente a `user` por get_owned_project
+    # (404 se não). Nenhum UUID alheio é legível.
+    project_id = project.id
     cards = (
         await session.scalars(select(Card).where(Card.project_id == project_id))
     ).all()
