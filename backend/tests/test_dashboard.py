@@ -36,20 +36,35 @@ async def test_dashboard_lists_recent_executions(client: AsyncClient) -> None:
     assert isinstance(resp.json()["data"]["recent_executions"], list)
 
 
-async def test_dashboard_spend_vs_limit_ratio(client: AsyncClient) -> None:
+async def test_dashboard_spend_vs_limit_ratio(
+    client: AsyncClient, session_factory
+) -> None:
     # O router /users (CRUD de User) foi removido no FEAT-C001 (mitiga IDOR
-    # em massa). O user e' criado via /auth/register; o budget (/users/{id}/budget)
-    # continua montado e e' usado aqui para semear o gasto.
+    # em massa). O user e' criado via /auth/register.
+    # FEAT-002: current_month_spend_usd nao e mais settable via API (anti-fraude);
+    # o gasto e semeado direto no banco, como as Executions fariam. O dashboard
+    # soma os budgets globalmente, entao criamos um unico budget controlado.
+    from uuid import UUID
+
+    from app.models.budget import BudgetLimit
+    from sqlalchemy import select
+
     reg = await client.post(
         "/api/v1/auth/register",
         json={"email": "d@ex.com", "display_name": "D", "password": "x12345678"},
     )
     uid = reg.json()["data"]["user"]["id"]
-    await client.put(
-        f"/api/v1/users/{uid}/budget",
-        json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,
-              "current_month_spend_usd": 5.0},
-    )
+    async with session_factory() as s:
+        budget = await s.scalar(
+            select(BudgetLimit).where(BudgetLimit.user_id == UUID(uid))
+        )
+        if budget is None:
+            budget = BudgetLimit(user_id=UUID(uid))
+            s.add(budget)
+        budget.monthly_limit_usd = 10.0
+        budget.per_project_limit_usd = 3.0
+        budget.current_month_spend_usd = 5.0
+        await s.commit()
     resp = await client.get("/api/v1/dashboard")
     data = resp.json()["data"]
     assert data["spend_vs_limit"]["limit_usd"] == 10.0

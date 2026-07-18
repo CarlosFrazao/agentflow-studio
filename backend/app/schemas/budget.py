@@ -7,9 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class BudgetUpdate(BaseModel):
+    # current_month_spend_usd NAO e aceito aqui (FEAT-002): e um campo derivado
+    # das Executions e nunca pode ser definido pelo cliente (anti-fraude de cap).
     monthly_limit_usd: float | None = Field(default=None, ge=0)
     per_project_limit_usd: float | None = Field(default=None, ge=0)
-    current_month_spend_usd: float | None = Field(default=None, ge=0)
 
 
 class BudgetResponse(BaseModel):

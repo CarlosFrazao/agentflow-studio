@@ -22,6 +22,23 @@ async def _login_as(client: AsyncClient, user_id: str, session_factory) -> None:
     client._transport.app.dependency_overrides[get_current_user] = override
 
 
+async def _set_spend(user_id: str, amount: float, session_factory) -> None:
+    """Semeia gasto acumulado direto no banco (FEAT-002: spend nao e settable
+    via API; simula o que as Executions fariam)."""
+    from app.models.budget import BudgetLimit
+    from sqlalchemy import select
+
+    async with session_factory() as s:
+        budget = await s.scalar(
+            select(BudgetLimit).where(BudgetLimit.user_id == UUID(user_id))
+        )
+        if budget is None:
+            budget = BudgetLimit(user_id=UUID(user_id))
+            s.add(budget)
+        budget.current_month_spend_usd = amount
+        await s.commit()
+
+
 async def _create_user(client: AsyncClient) -> str:
     # FEAT-C001: router /users (CRUD de User) removido para eliminar IDOR.
     # Usuarios sao criados via /auth/register (envelope {data: {user: {id}}}).
@@ -128,9 +145,9 @@ async def test_budget_warning_at_80_percent(
     await _login_as(client, uid, session_factory)
     await client.put(
         f"/api/v1/users/{uid}/budget",
-        json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,
-              "current_month_spend_usd": 8.5},
+        json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0},
     )
+    await _set_spend(uid, 8.5, session_factory)  # gasto real (nao settable via API)
     resp = await client.get(f"/api/v1/users/{uid}/budget")
     assert resp.json()["data"]["warning_level"] == "warning"  # 85% > 80%
 
@@ -142,8 +159,8 @@ async def test_budget_blocked_at_100_percent(
     await _login_as(client, uid, session_factory)
     await client.put(
         f"/api/v1/users/{uid}/budget",
-        json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,
-              "current_month_spend_usd": 10.0},
+        json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0},
     )
+    await _set_spend(uid, 10.0, session_factory)  # gasto real (nao settable via API)
     resp = await client.get(f"/api/v1/users/{uid}/budget")
     assert resp.json()["data"]["warning_level"] == "blocked"  # 100%
