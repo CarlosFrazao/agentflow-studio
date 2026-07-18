@@ -1,14 +1,11 @@
 """API de Snippets (F-009) — biblioteca de trechos com licença obrigatória."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_request_id
+from app.api.v1.deps import get_current_user, get_request_id
 from app.core.database import get_session
-from app.core.exceptions import NotFoundError
 from app.core.responses import paginated_envelope, success_envelope
 from app.models.snippet import Snippet
 from app.models.user import User
@@ -20,14 +17,12 @@ router = APIRouter(prefix="/snippets", tags=["snippets"])
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_snippet(
     body: SnippetCreate,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    if not await session.get(User, body.user_id):
-        raise NotFoundError("User", str(body.user_id))
     snippet = Snippet(
-        user_id=body.user_id,
+        user_id=user.id,
         title=body.title,
         content=body.content,
         language=body.language,
@@ -46,16 +41,13 @@ async def create_snippet(
 @router.get("", response_model=None)
 async def list_snippets(
     request: Request,
+    user: User = Depends(get_current_user),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
-    user_id: UUID | None = Query(default=None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ) -> dict:
-    stmt = select(Snippet)
-    if user_id is not None:
-        stmt = stmt.where(Snippet.user_id == user_id)
+    stmt = select(Snippet).where(Snippet.user_id == user.id)
     total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     offset = (page - 1) * per_page
     rows = (

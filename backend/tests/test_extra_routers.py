@@ -51,22 +51,27 @@ async def _create_user(client: AsyncClient) -> str:
 
 
 # ---- F-009 Snippets ----
-async def test_create_snippet_requires_license(client: AsyncClient) -> None:
+async def test_create_snippet_requires_license(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     # sem campo license -> 422
     resp = await client.post(
         "/api/v1/snippets",
-        json={"user_id": uid, "title": "S", "content": "x", "language": "py"},
+        json={"title": "S", "content": "x", "language": "py"},
     )
     assert resp.status_code == 422
 
 
-async def test_create_snippet_with_copyleft_flag(client: AsyncClient) -> None:
+async def test_create_snippet_with_copyleft_flag(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     resp = await client.post(
         "/api/v1/snippets",
         json={
-            "user_id": uid,
             "title": "GPL lib",
             "content": "x",
             "language": "py",
@@ -75,15 +80,21 @@ async def test_create_snippet_with_copyleft_flag(client: AsyncClient) -> None:
     )
     assert resp.status_code == 201
     assert resp.json()["data"]["license"] == "GPL"
+    # FEAT-004: o dono e o usuario autenticado, nunca o user_id do body (ignorado).
+    assert str(resp.json()["data"]["user_id"]) == uid
 
 
-async def test_list_snippets_by_user(client: AsyncClient) -> None:
+async def test_list_snippets_by_user(
+    client: AsyncClient, session_factory
+) -> None:
     uid = await _create_user(client)
+    await _login_as(client, uid, session_factory)
     await client.post(
         "/api/v1/snippets",
-        json={"user_id": uid, "title": "A", "content": "x", "license": "MIT"},
+        json={"title": "A", "content": "x", "license": "MIT"},
     )
-    resp = await client.get(f"/api/v1/snippets?user_id={uid}")
+    # FEAT-004: lista apenas os snippets do dono autenticado (sem filtro por query).
+    resp = await client.get("/api/v1/snippets")
     assert resp.status_code == 200
     assert len(resp.json()["data"]) == 1
 

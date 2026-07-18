@@ -9,7 +9,6 @@ from app.models.snippet import SNIPPET_LICENSES
 
 
 class SnippetCreate(BaseModel):
-    user_id: UUID
     title: str = Field(min_length=1, max_length=200)
     content: str
     language: str = "text"
