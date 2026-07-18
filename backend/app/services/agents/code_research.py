@@ -113,7 +113,9 @@ class CodeResearchAgent:
                     external_docs.append(content)
             except FirecrawlUnavailableError as exc:
                 degraded = True
-                logger.warning("code_research_firecrawl_unavailable", repo=repo, error=str(exc))
+                logger.warning(
+                    "code_research_firecrawl_unavailable", repo=repo, error=str(exc)
+                )
                 # Tarefa B (D2): registra a indisponibilidade na memória de
                 # aprendizado (gravação síncrona em thread separada, fail-open).
                 try:
@@ -131,7 +133,11 @@ class CodeResearchAgent:
 
         # 3) Síntese via LLM (usa só o que conseguimos coletar)
         try:
-            extra = f"\nDOCS_EXTERNOS:\n{chr(10).join(external_docs)}" if external_docs else ""
+            extra = (
+                f"\nDOCS_EXTERNOS:\n{chr(10).join(external_docs)}"
+                if external_docs
+                else ""
+            )
             data = await self._llm.generate_json(
                 system_prompt=_CODE_RESEARCH_SYSTEM,
                 user_prompt=f"repo={repo}\nREADME:\n{readme}\nLICENSE:\n{license_text}{extra}",
@@ -182,7 +188,9 @@ class CodeResearchAgent:
             return "copyleft"
         for match in _COPYLEFT_RE.finditer(upper):
             start, end = match.start(), match.end()
-            window = upper[max(0, start - _LICENSE_CONTEXT_WINDOW): end + _LICENSE_CONTEXT_WINDOW]
+            window = upper[
+                max(0, start - _LICENSE_CONTEXT_WINDOW) : end + _LICENSE_CONTEXT_WINDOW
+            ]
             if _LICENSE_CONTEXT_RE.search(window):
                 return "copyleft"
         if any(k in upper for k in ("MIT", "APACHE", "BSD")):

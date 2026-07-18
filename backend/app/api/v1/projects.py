@@ -1,13 +1,10 @@
 """API de Projects — CRUD com envelope padronizado."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.exceptions import NotFoundError
 from app.api.v1.deps import get_current_user, get_owned_project, get_request_id
 from app.core.responses import paginated_envelope, success_envelope
 from app.models.project import Project
@@ -24,9 +21,7 @@ async def create_project(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    project = Project(
-        name=body.name, description=body.description, user_id=user.id
-    )
+    project = Project(name=body.name, description=body.description, user_id=user.id)
     session.add(project)
     await session.commit()
     await session.refresh(project)
@@ -40,7 +35,6 @@ async def create_project(
 async def list_projects(
     request_id: str = Depends(get_request_id),
     user: User = Depends(get_current_user),
-
     session: AsyncSession = Depends(get_session),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
@@ -104,4 +98,3 @@ async def delete_project(
 ) -> None:
     await session.delete(project)
     await session.commit()
-

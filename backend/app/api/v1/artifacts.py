@@ -15,7 +15,9 @@ from app.schemas.artifact import ArtifactCreate, ArtifactResponse
 router = APIRouter(prefix="/cards", tags=["artifacts"])
 
 
-@router.post("/{card_id}/artifacts", response_model=None, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{card_id}/artifacts", response_model=None, status_code=status.HTTP_201_CREATED
+)
 async def create_artifact(
     body: ArtifactCreate,
     card: Card = Depends(get_owned_card),
@@ -46,9 +48,7 @@ async def list_artifacts(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     rows = (
-        await session.scalars(
-            select(Artifact).where(Artifact.card_id == card.id)
-        )
+        await session.scalars(select(Artifact).where(Artifact.card_id == card.id))
     ).all()
     items = [ArtifactResponse.model_validate(r).model_dump(mode="json") for r in rows]
     return success_envelope(data=items, request_id=request_id)

@@ -21,9 +21,7 @@ class SRAUnavailableError(Exception):
 class SRAClient(BaseMCPClient):
     """Consome ferramentas de pesquisa do SRA via MCP SSE."""
 
-    def __init__(
-        self, settings: Settings | None = None, clock=None
-    ) -> None:
+    def __init__(self, settings: Settings | None = None, clock=None) -> None:
         s = settings or get_settings()
         # O servidor MCP do SRA (self-hosted) rejeita o Host header automático
         # (421 Invalid Host header) quando acessado pela rede Docker pelo nome

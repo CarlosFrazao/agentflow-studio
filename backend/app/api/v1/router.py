@@ -29,34 +29,14 @@ router.include_router(auth.router)
 router.include_router(share.router)
 router.include_router(share_ws.router)
 # Protegidos por JWT.
-router.include_router(
-    projects.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    cards.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    conversations.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    artifacts.router, dependencies=[Depends(get_current_user)]
-)
+router.include_router(projects.router, dependencies=[Depends(get_current_user)])
+router.include_router(cards.router, dependencies=[Depends(get_current_user)])
+router.include_router(conversations.router, dependencies=[Depends(get_current_user)])
+router.include_router(artifacts.router, dependencies=[Depends(get_current_user)])
 router.include_router(run.router, dependencies=[Depends(get_current_user)])
-router.include_router(
-    snippets.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    preferences.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    budget.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    dashboard.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    metrics.router, dependencies=[Depends(get_current_user)]
-)
-router.include_router(
-    agents.router, dependencies=[Depends(get_current_user)]
-)
+router.include_router(snippets.router, dependencies=[Depends(get_current_user)])
+router.include_router(preferences.router, dependencies=[Depends(get_current_user)])
+router.include_router(budget.router, dependencies=[Depends(get_current_user)])
+router.include_router(dashboard.router, dependencies=[Depends(get_current_user)])
+router.include_router(metrics.router, dependencies=[Depends(get_current_user)])
+router.include_router(agents.router, dependencies=[Depends(get_current_user)])

@@ -8,8 +8,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class AgentBase(BaseModel):
     name: str = Field(..., description="Nome unico do agente")
-    model: str = Field(..., description="Modelo LLM a ser usado (ex: claude-3-5-sonnet)")
-    system_prompt: str = Field(..., description="Prompt do sistema que define o comportamento base")
+    model: str = Field(
+        ..., description="Modelo LLM a ser usado (ex: claude-3-5-sonnet)"
+    )
+    system_prompt: str = Field(
+        ..., description="Prompt do sistema que define o comportamento base"
+    )
     allowed_tools: List[str] = Field(
         default_factory=list, description="Ferramentas que o agente pode usar"
     )

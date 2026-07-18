@@ -70,10 +70,39 @@ class IdeationAgent:
 # to reach the actual product description. Includes intent verbs ("quero",
 # "criar") and the generic product nouns ("app", "site", "de").
 _INTENT_LEADING_WORDS = {
-    "quero", "criar", "fazer", "tenho", "gostaria", "preciso", "quer", "queria",
-    "um", "uma", "uns", "umas", "app", "site", "sistema", "system",
-    "plataforma", "plataform", "de", "da", "do", "das", "dos", "para",
-    "i", "want", "to", "build", "an", "a", "the", "of", "for",
+    "quero",
+    "criar",
+    "fazer",
+    "tenho",
+    "gostaria",
+    "preciso",
+    "quer",
+    "queria",
+    "um",
+    "uma",
+    "uns",
+    "umas",
+    "app",
+    "site",
+    "sistema",
+    "system",
+    "plataforma",
+    "plataform",
+    "de",
+    "da",
+    "do",
+    "das",
+    "dos",
+    "para",
+    "i",
+    "want",
+    "to",
+    "build",
+    "an",
+    "a",
+    "the",
+    "of",
+    "for",
 }
 
 _GENERIC_NOUNS = {"app", "site", "sistema", "system", "plataforma", "plataform"}
@@ -125,4 +154,3 @@ def _derive_name(raw_idea: str) -> str:
     if had_generic and not any(w.lower() in _GENERIC_NOUNS for w in words):
         return f"App de {phrase}"
     return phrase
-

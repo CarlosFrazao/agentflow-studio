@@ -7,7 +7,6 @@ env vars do host (PRD F-006 / Spec §3.2). Em produção usa a imagem
 
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 from app.sandbox.base import SandboxBackend, SandboxResult
 
@@ -28,19 +27,23 @@ class DockerSandbox(SandboxBackend):
         """
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".py", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
             tmp.write(code)
             tmp_path = Path(tmp.name)
 
         cmd = [
-            "docker", "run", "--rm",
-            "--network", "none",
-            "-e", "DISABLED",
-            "-v", f"{tmp_path}:/sandbox/code.py:ro",
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "-e",
+            "DISABLED",
+            "-v",
+            f"{tmp_path}:/sandbox/code.py:ro",
             self._image,
-            "python", "/sandbox/code.py",
+            "python",
+            "/sandbox/code.py",
         ]
         try:
             proc = await asyncio.create_subprocess_exec(

@@ -54,14 +54,14 @@ async def get_dashboard(
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
-    project_id: UUID | None = Query(default=None, description="Filtrar por projeto (drill-down)"),
+    project_id: UUID | None = Query(
+        default=None, description="Filtrar por projeto (drill-down)"
+    ),
 ) -> dict:
     # Escopo de tenant: só os recursos do usuário autenticado.
     projects_created = (
         await session.scalar(
-            select(func.count())
-            .select_from(Project)
-            .where(Project.user_id == user.id)
+            select(func.count()).select_from(Project).where(Project.user_id == user.id)
         )
         or 0
     )
@@ -98,7 +98,9 @@ async def get_dashboard(
 
     # custo total (respeita filtro de tenant + projeto quando presente)
     total_cost = (
-        await session.scalar(select(func.coalesce(func.sum(c_cost), 0.0)).select_from(src))
+        await session.scalar(
+            select(func.coalesce(func.sum(c_cost), 0.0)).select_from(src)
+        )
         or 0.0
     )
 

@@ -12,7 +12,7 @@ impede zerar o gasto e contornar o cap).
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_request_id
@@ -38,13 +38,9 @@ def _warning_level(spend: float, limit: float) -> str:
     return "ok"
 
 
-async def _get_or_create_budget(
-    user: User, session: AsyncSession
-) -> BudgetLimit:
+async def _get_or_create_budget(user: User, session: AsyncSession) -> BudgetLimit:
     """Devolve o orcamento do usuario autenticado, criando defaults se ausente."""
-    budget = await session.scalar(
-        select_budget().where(BudgetLimit.user_id == user.id)
-    )
+    budget = await session.scalar(select_budget().where(BudgetLimit.user_id == user.id))
     if not budget:
         budget = BudgetLimit(user_id=user.id)
         session.add(budget)

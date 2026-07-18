@@ -102,4 +102,3 @@ async def get_owned_conversation(
     if project is None or project.user_id != user.id:
         raise NotFoundError("Conversation", str(conversation_id))
     return conv
-

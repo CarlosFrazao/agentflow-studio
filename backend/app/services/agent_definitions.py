@@ -47,7 +47,8 @@ def _write_yaml(agent: AgentModel) -> None:
             "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
         }
         _yaml_path(_slug(agent.name)).write_text(
-            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8"
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
         )
     except OSError as exc:  # pragma: no cover - depende do FS
         logger.error("agent_yaml_write_failed", name=agent.name, error=str(exc))

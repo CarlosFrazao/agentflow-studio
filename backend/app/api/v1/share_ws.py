@@ -99,9 +99,7 @@ async def share_ws(
                 payload_conv = payload.get("conversation_id")
                 if payload_conv is not None and payload_conv != conversation_id:
                     continue
-            await websocket.send_json(
-                {"type": event.type, "payload": payload}
-            )
+            await websocket.send_json({"type": event.type, "payload": payload})
     except WebSocketDisconnect:
         pass
     finally:

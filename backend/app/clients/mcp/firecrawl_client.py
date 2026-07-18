@@ -75,7 +75,9 @@ class FirecrawlClient(BaseMCPClient):
             else:
                 async with httpx.AsyncClient(timeout=self._timeout_s) as client:
                     resp = await client.post(
-                        f"{self._rest_url}/v2/scrape", json={"url": url}, headers=headers
+                        f"{self._rest_url}/v2/scrape",
+                        json={"url": url},
+                        headers=headers,
                     )
             resp.raise_for_status()
             return resp.json()

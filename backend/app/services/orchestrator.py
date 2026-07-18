@@ -12,8 +12,6 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from app.models.card import KANBAN_COLUMNS
-
 logger = logging.getLogger(__name__)
 
 # Fluxo linear do pipeline (PRD F-001)
@@ -107,8 +105,7 @@ def revert_auto_approval(card: Any) -> bool:
 
 def should_auto_approve(confidence_score: float, critical_alerts: int) -> bool:
     return (
-        confidence_score >= AUTO_APPROVE_CONFIDENCE_THRESHOLD
-        and critical_alerts <= 0
+        confidence_score >= AUTO_APPROVE_CONFIDENCE_THRESHOLD and critical_alerts <= 0
     )
 
 
@@ -232,10 +229,7 @@ def inject_context(card: Any, base_prompt: str) -> str:
         preferences = get_preferences_for_card(card)
         if preferences:
             joined = "\n".join(f"- {line}" for line in preferences)
-            segments.append(
-                "Preferências do usuário (honre neste card):\n"
-                f"{joined}"
-            )
+            segments.append("Preferências do usuário (honre neste card):\n" f"{joined}")
     except ImportError as exc:
         logger.debug(
             "inject_context: preference_graph indisponível (Fase D1), pulando preferências: %s",

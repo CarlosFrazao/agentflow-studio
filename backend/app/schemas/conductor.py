@@ -4,8 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.conversation import MSG_ROLES
-
 
 class ConversationCreate(BaseModel):
     project_id: UUID
@@ -52,6 +50,7 @@ class ConductorTurnResponse(BaseModel):
 
 
 # --- Plano emitido pelo LLM (parsing manual de function calling) ---
+
 
 class _ToolCallIntent(BaseModel):
     tool: str

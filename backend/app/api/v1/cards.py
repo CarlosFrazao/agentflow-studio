@@ -43,7 +43,6 @@ def _deep_merge_meta(base: dict, incoming: dict) -> dict:
     return result
 
 
-
 @router.post("", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_card(
     body: CardCreate,
@@ -83,7 +82,14 @@ async def create_card(
     await session.refresh(card)
     # Publica evento para o WebSocket de compartilhamento (Item D).
     event_bus.publish(
-        Event(type="card.created", payload={"card_id": str(card.id), "project_id": str(card.project_id), "column": card.column})
+        Event(
+            type="card.created",
+            payload={
+                "card_id": str(card.id),
+                "project_id": str(card.project_id),
+                "column": card.column,
+            },
+        )
     )
     return success_envelope(
         data=CardResponse.model_validate(card).model_dump(mode="json"),
@@ -95,7 +101,6 @@ async def create_card(
 async def list_cards(
     request_id: str = Depends(get_request_id),
     user: User = Depends(get_current_user),
-
     session: AsyncSession = Depends(get_session),
     project_id: UUID | None = Query(default=None),
     column: str | None = Query(default=None),
@@ -114,12 +119,7 @@ async def list_cards(
         if column not in KANBAN_COLUMNS:
             raise ValidationError(f"coluna invalida: {column}")
         stmt = stmt.where(Card.column == column)
-    total = (
-        await session.scalar(
-            select(func.count()).select_from(stmt.subquery())
-        )
-        or 0
-    )
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     offset = (page - 1) * per_page
     rows = (
         await session.scalars(

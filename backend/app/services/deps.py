@@ -1,7 +1,5 @@
 """Dependencies de serviço — fornecem LLM e clients externos (com override p/ testes)."""
 
-from typing import Optional
-
 from fastapi import Request
 
 from app.clients.github_client import GitHubClient
@@ -9,9 +7,7 @@ from app.clients.mcp.firecrawl_client import FirecrawlClient
 from app.clients.mcp.sra_client import SRAClient
 from app.sandbox.base import SandboxBackend, get_sandbox_backend
 from app.services.llm import (
-    GeminiClient,
     LLMClient,
-    build_llm_chain,
     call_with_fallback,
 )
 
@@ -35,14 +31,10 @@ class _FallbackLLMClient(LLMClient):
     """
 
     async def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict:
-        return await call_with_fallback(
-            system_prompt, user_prompt, json_mode=True
-        )
+        return await call_with_fallback(system_prompt, user_prompt, json_mode=True)
 
     async def generate_text(self, *, system_prompt: str, user_prompt: str) -> str:
-        return await call_with_fallback(
-            system_prompt, user_prompt, json_mode=False
-        )
+        return await call_with_fallback(system_prompt, user_prompt, json_mode=False)
 
 
 def get_llm(request: Request) -> LLMClient:

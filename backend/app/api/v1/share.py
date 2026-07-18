@@ -10,15 +10,12 @@ O WebSocket em /share/{project_id}/ws segue o mesmo modelo (ver
 app/api/v1/share_ws.py), alimentado pelo EventBus.
 """
 
-from uuid import UUID
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_owned_project, get_request_id
 from app.core.database import get_session
-from app.core.exceptions import NotFoundError
 from app.core.responses import success_envelope
 from app.models.card import Card
 from app.models.execution import Execution
@@ -60,7 +57,11 @@ def build_shared_board(project_id: str, cards: list, executions: list) -> dict:
         }
         for e in executions
     ]
-    return {"project_id": str(project_id), "columns": columns, "recent_executions": recent}
+    return {
+        "project_id": str(project_id),
+        "columns": columns,
+        "recent_executions": recent,
+    }
 
 
 @router.get("/{project_id}", response_model=None)

@@ -23,7 +23,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.auth import AuthLogin, AuthRegister, TokenResponse, UserPublic
+from app.schemas.auth import AuthLogin, AuthRegister, UserPublic
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,9 +45,7 @@ async def register(
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    existing = await session.scalar(
-        select(User).where(User.email == body.email)
-    )
+    existing = await session.scalar(select(User).where(User.email == body.email))
     if existing:
         raise ConflictError("email ja cadastrado")
 
@@ -92,7 +90,6 @@ async def refresh(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Renova o access token a partir de um refresh token válido (rotação)."""
-    from app.core.config import get_settings
 
     header = request.headers.get("Authorization", "")
     if not header.startswith("Bearer "):

@@ -80,9 +80,7 @@ async def init_db() -> None:
         asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=1) as executor:
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(
-                executor, lambda: command.upgrade(cfg, "head")
-            )
+            await loop.run_in_executor(executor, lambda: command.upgrade(cfg, "head"))
     except RuntimeError:
         # Sem loop em execução (CLI standalone: `alembic upgrade head`).
         command.upgrade(cfg, "head")

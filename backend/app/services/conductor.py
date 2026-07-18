@@ -18,7 +18,6 @@ Constantes de auto-approve (ADR-007) são REAPROVEITADAS de `orchestrator.py`
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import UUID
 
 import time
 
@@ -30,7 +29,6 @@ from app.models.artifact import Artifact
 from app.models.card import Card
 from app.models.conversation import Conversation, Message
 from app.services.orchestrator import (
-    AUTO_APPROVE_CONFIDENCE_THRESHOLD,
     column_after_review,
     next_column,
     revert_auto_approval,
@@ -45,7 +43,6 @@ from app.services.pipeline_helpers import (
 from app.services.artifact_compressor import compress_artifact
 from app.core.config import get_settings
 from app.services.event_bus import Event, event_bus
-from app.services.llm import stream_with_fallback
 
 logger = get_logger("conductor")
 
@@ -136,15 +133,15 @@ _SYSTEM_PROMPT = (
     '"production" rode "run_dev"; (7) use "get_card_state" para consultar o '
     'card; (8) quando a ideation já rodou e o card está em "backlog" aguardando '
     'sua confirmação, use "confirm_ideation" para avançar para "researching" '
-    '(se o usuário enviar correções, elas são aplicadas antes de avançar). (9) '
+    "(se o usuário enviar correções, elas são aplicadas antes de avançar). (9) "
     "quando o usuário fizer uma pergunta ou discussão sobre o que já foi feito "
-    "(sem intenção de avançar o pipeline), use \"answer_question\" com "
+    '(sem intenção de avançar o pipeline), use "answer_question" com '
     '"tool_calls":[] e apenas "narrative" — NÃO rode o próximo agente nem avance '
-    'o card. (10) se o usuário perguntar DETALHES de uma etapa já concluída '
+    "o card. (10) se o usuário perguntar DETALHES de uma etapa já concluída "
     '(ex: "o que o Research encontrou sobre concorrentes?"), use "get_artifact" '
     'com {"agent_name": "<ideation|research|code_research|planner|reviewer|dev>"} '
-    'para buscar o CONTEÚDO REAL do artifact ANTES de responder — NÃO responda de '
-    'memória do resumo narrado nem resuma por conta própria. get_artifact é '
+    "para buscar o CONTEÚDO REAL do artifact ANTES de responder — NÃO responda de "
+    "memória do resumo narrado nem resuma por conta própria. get_artifact é "
     "somente-leitura (não avança o card). (11) voce tem memoria por orcamento de "
     "tokens: o historico das mensagens recentes e injetado no prompt, e quando ele "
     "estoura o limite as mensagens mais antigas sao resumidas (bloco "
@@ -301,7 +298,9 @@ class Conductor:
                 awaiting_user = True
             # FEAT-005: pausa pós-ideation — o card aguarda confirmação do usuário.
             # Inclui o branch de clarificação (FEAT-001): ideia vaga também pausa.
-            if result.get("awaiting_confirmation") or result.get("awaiting_clarification"):
+            if result.get("awaiting_confirmation") or result.get(
+                "awaiting_clarification"
+            ):
                 awaiting_confirmation = True
 
         # 3) Narrativa: usa a do plano (LLM) ou gera a partir dos resultados.
@@ -342,7 +341,9 @@ class Conductor:
     # intacto + streaming de status/chunks via EventBus -> WebSocket).
     # ------------------------------------------------------------------
 
-    def _publish_agent_event(self, agent: str, status: str, label: str | None = None) -> None:
+    def _publish_agent_event(
+        self, agent: str, status: str, label: str | None = None
+    ) -> None:
         """Publica mudança de status de um agente no EventBus (tempo real).
 
         O frontend do chat consome via /share/{project_id}/ws e exibe o
@@ -350,7 +351,11 @@ class Conductor:
         agente é normalizado (sem prefixo ``run_``/``_tool``) para exibição e
         matching estáveis no cliente.
         """
-        clean = agent.replace("run_", "").replace("_tool", "").replace("confirm_ideation", "ideation")
+        clean = (
+            agent.replace("run_", "")
+            .replace("_tool", "")
+            .replace("confirm_ideation", "ideation")
+        )
         project_id = str(getattr(self._conversation, "project_id", "") or "")
         event_bus.publish(
             Event(
@@ -474,7 +479,13 @@ class Conductor:
             plan = _ConductorPlanShim(**data)
         except Exception:  # noqa: BLE001
             return None
-        calls = [c for c in plan.tool_calls if c.tool in COLUMN_TO_TOOLS.get(column or "", []) or c.tool in (TOOL_ASK_USER, TOOL_GET_CARD_STATE, TOOL_CONFIRM_IDEATION, TOOL_ANSWER)]
+        calls = [
+            c
+            for c in plan.tool_calls
+            if c.tool in COLUMN_TO_TOOLS.get(column or "", [])
+            or c.tool
+            in (TOOL_ASK_USER, TOOL_GET_CARD_STATE, TOOL_CONFIRM_IDEATION, TOOL_ANSWER)
+        ]
         # Se o card ainda não existe, só run_ideation é aceitável como primeira ação.
         if column is None and calls and calls[0].tool != TOOL_IDEATION:
             return None
@@ -557,8 +568,7 @@ class Conductor:
         overflow_text = self._format_history(overflow)
         summary = await compress_artifact(overflow_text)
         summary_block = (
-            "[RESUMO DAS MENSAGENS ANTERIORES (contexto comprimido):]\n"
-            f"{summary}"
+            "[RESUMO DAS MENSAGENS ANTERIORES (contexto comprimido):]\n" f"{summary}"
         )
         recent_text = self._format_history(recent)
         if recent_text:
@@ -647,14 +657,23 @@ class Conductor:
             # rodam via _run_tool (get_card_state/get_artifact/answer_question).
             return await self._run_tool(name, card, {})
 
-        raw = await asyncio.gather(*[_exec_one(n) for n in names], return_exceptions=True)
+        raw = await asyncio.gather(
+            *[_exec_one(n) for n in names], return_exceptions=True
+        )
 
         # 2) Aplicação serial (persistência + avanço de coluna), na ordem de `names`.
         results: list[dict[str, Any]] = []
         for name, out in zip(names, raw):
             if isinstance(out, Exception):
                 logger.warning("parallel_tool_failed", tool=name, error=str(out))
-                results.append({"tool": name, "input": {}, "output": {"error": str(out)}, "card": card})
+                results.append(
+                    {
+                        "tool": name,
+                        "input": {},
+                        "output": {"error": str(out)},
+                        "card": card,
+                    }
+                )
                 continue
             if name == TOOL_RESEARCH:
                 results.append(await self._apply_research(card, out))
@@ -664,7 +683,9 @@ class Conductor:
                 # get_card_state / get_artifact / answer_question: o próprio
                 # _run_tool já persiste a mensagem de tool mais abaixo; aqui só
                 # registramos o resultado para exibição consistente.
-                results.append(out if isinstance(out, dict) else {"tool": name, "card": card})
+                results.append(
+                    out if isinstance(out, dict) else {"tool": name, "card": card}
+                )
         return results
 
     async def _tool_ideation(self) -> dict[str, Any]:
@@ -840,9 +861,15 @@ class Conductor:
         if card is None:
             return self._no_card(TOOL_PLANNER)
         budget_remaining = await budget_remaining_usd(self._session, card)
-        research_content = await latest_artifact_content(self._session, card.id, "research")
-        cr_content = await latest_artifact_content(self._session, card.id, "code_research")
-        research_compressed = await maybe_compress(research_content or "", budget_remaining)
+        research_content = await latest_artifact_content(
+            self._session, card.id, "research"
+        )
+        cr_content = await latest_artifact_content(
+            self._session, card.id, "code_research"
+        )
+        research_compressed = await maybe_compress(
+            research_content or "", budget_remaining
+        )
         cr_compressed = await maybe_compress(cr_content or "", budget_remaining)
         out = await PlannerAgent(llm=self._llm).run(
             ideation=await parse_ideation(
@@ -871,10 +898,18 @@ class Conductor:
 
         if card is None:
             return self._no_card(TOOL_REVIEWER)
-        ideation_content = await latest_artifact_content(self._session, card.id, "ideation")
-        research_content = await latest_artifact_content(self._session, card.id, "research")
-        planner_content = await latest_artifact_content(self._session, card.id, "planner")
-        cr_content = await latest_artifact_content(self._session, card.id, "code_research")
+        ideation_content = await latest_artifact_content(
+            self._session, card.id, "ideation"
+        )
+        research_content = await latest_artifact_content(
+            self._session, card.id, "research"
+        )
+        planner_content = await latest_artifact_content(
+            self._session, card.id, "planner"
+        )
+        cr_content = await latest_artifact_content(
+            self._session, card.id, "code_research"
+        )
         out = await ReviewerAgent(llm=self._llm).run(
             ideation=await parse_ideation(ideation_content),
             research=research_content or "",
@@ -937,7 +972,9 @@ class Conductor:
 
         if card is None:
             return self._no_card(TOOL_DEV)
-        planner_content = await latest_artifact_content(self._session, card.id, "planner")
+        planner_content = await latest_artifact_content(
+            self._session, card.id, "planner"
+        )
         out = await DevAgent(llm=self._llm, sandbox=self._sandbox).run(
             planner_content or ""
         )
@@ -957,7 +994,12 @@ class Conductor:
 
     async def _tool_card_state(self, card: Card | None) -> dict[str, Any]:
         if card is None:
-            return {"tool": TOOL_GET_CARD_STATE, "input": {}, "output": {"exists": False}, "card": None}
+            return {
+                "tool": TOOL_GET_CARD_STATE,
+                "input": {},
+                "output": {"exists": False},
+                "card": None,
+            }
         return {
             "tool": TOOL_GET_CARD_STATE,
             "input": {},
@@ -1117,10 +1159,13 @@ class Conductor:
         # Id do artifact anterior (o mais recente ANTES de criar a nova revisão).
         previous_artifact_id = (
             await self._session.execute(
-                select(Artifact.id).where(
+                select(Artifact.id)
+                .where(
                     Artifact.card_id == card.id,
                     Artifact.agent_name == agent_name,
-                ).order_by(Artifact.id.desc()).limit(1)
+                )
+                .order_by(Artifact.id.desc())
+                .limit(1)
             )
         ).scalar_one()
 
@@ -1132,8 +1177,14 @@ class Conductor:
                 ideation=await parse_ideation(
                     await latest_artifact_content(self._session, card.id, "ideation")
                 ),
-                research=await latest_artifact_content(self._session, card.id, "research") or "",
-                code_research=await latest_artifact_content(self._session, card.id, "code_research") or "",
+                research=await latest_artifact_content(
+                    self._session, card.id, "research"
+                )
+                or "",
+                code_research=await latest_artifact_content(
+                    self._session, card.id, "code_research"
+                )
+                or "",
             )
             new_content = out.model_dump_json()
             # Injeta a instrução de revisão no conteúdo para rastreabilidade.
@@ -1175,7 +1226,9 @@ class Conductor:
             # O Reviewer foi executado com o plano antigo: marca como superseded
             # e avisa que precisa rodar de novo (não re-executa sob demanda).
             reviewer_versions = dict(versions.get("reviewer", {}))
-            reviewer_superseded_list = list(reviewer_versions.get("superseded", []) or [])
+            reviewer_superseded_list = list(
+                reviewer_versions.get("superseded", []) or []
+            )
             if reviewer_versions.get("current") is not None:
                 reviewer_superseded_list.append(str(reviewer_versions.get("current")))
             reviewer_versions["superseded"] = reviewer_superseded_list
@@ -1220,7 +1273,9 @@ class Conductor:
         self, card: Card, agent_name: str, content: str, *, confidence: float = 0.0
     ) -> None:
         self._session.add(
-            Artifact(card_id=card.id, agent_name=agent_name, type="json", content=content)
+            Artifact(
+                card_id=card.id, agent_name=agent_name, type="json", content=content
+            )
         )
         await self._session.commit()
 
@@ -1311,6 +1366,7 @@ class Conductor:
 # Helpers de streaming (abordagem híbrida)
 # ----------------------------------------------------------------------
 
+
 def _split_for_streaming(text: str, *, max_chars: int = 40) -> list[str]:
     """Quebra um texto em chunks para progressão visual no WebSocket.
 
@@ -1354,6 +1410,7 @@ def _split_for_streaming(text: str, *, max_chars: int = 40) -> list[str]:
 # ----------------------------------------------------------------------
 # Shims de validação (mantêm o módulo independente de imports pesados)
 # ----------------------------------------------------------------------
+
 
 class _ConductorPlanShim:
     """Validador mínimo do JSON do LLM (fail-open amigável)."""

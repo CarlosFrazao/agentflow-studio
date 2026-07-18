@@ -7,6 +7,7 @@ from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, uuid_pk
+from app.models.project import Project
 
 KANBAN_COLUMNS = (
     "backlog",
@@ -24,9 +25,7 @@ class Card(Base, TimestampMixin):
     __tablename__ = "cards"
 
     id: Mapped[UUID] = uuid_pk()
-    project_id: Mapped[UUID] = mapped_column(
-        ForeignKey("projects.id"), nullable=False
-    )
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
     # Relationship para acesso ao Project pai sem query extra (usado pelo
     # get_owned_card com selectinload para evitar N+1).
     project: Mapped["Project"] = relationship("Project", lazy="selectin")

@@ -75,10 +75,7 @@ def _build_edges(prefs: list[UserPreference]) -> list[dict[str, Any]]:
     """
     edges: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    meta = [
-        (str(p.id), p.attribute, p.value, _tokenize(p.value))
-        for p in prefs
-    ]
+    meta = [(str(p.id), p.attribute, p.value, _tokenize(p.value)) for p in prefs]
     for i in range(len(meta)):
         id_a, attr_a, val_a, tok_a = meta[i]
         for j in range(i + 1, len(meta)):
@@ -128,7 +125,9 @@ def density_stats(
         "edges_per_node": round(len(edges) / n, 3),
         "linked_nodes": len(linked),
         "isolated_pct": round(100 * (n - len(linked)) / n, 1),
-        "applied_nodes": sum(1 for x in nodes if x["confidenceCount"] >= APPLY_THRESHOLD),
+        "applied_nodes": sum(
+            1 for x in nodes if x["confidenceCount"] >= APPLY_THRESHOLD
+        ),
         "archived_nodes": sum(1 for x in nodes if x["archived"]),
     }
 
@@ -189,7 +188,9 @@ async def mutate_preference(
         pref.archived = False
         logger.info("preference_restored", id=str(pref.id), attribute=pref.attribute)
     else:
-        raise ValidationError(f"acao invalida: {action!r} (use 'edit'|'remove'|'restore')")
+        raise ValidationError(
+            f"acao invalida: {action!r} (use 'edit'|'remove'|'restore')"
+        )
 
     await db_session.commit()
     await db_session.refresh(pref)

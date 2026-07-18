@@ -37,9 +37,8 @@ logger = get_logger("metrics_insights")
 DEFAULT_WINDOW_DAYS = 30
 
 # Join implícito Execution->Card->Project para restringir tudo ao dono.
-_CARD_PROJECT_JOIN = (
-    Execution.__table__.join(Card, Execution.card_id == Card.id)
-    .join(Project, Card.project_id == Project.id)
+_CARD_PROJECT_JOIN = Execution.__table__.join(Card, Execution.card_id == Card.id).join(
+    Project, Card.project_id == Project.id
 )
 
 
@@ -116,9 +115,8 @@ class InsightsEngine:
             Execution.started_at >= since
         )
         if self._user_id is not None:
-            stmt = (
-                stmt.select_from(_CARD_PROJECT_JOIN)
-                .where(Project.user_id == self._user_id)
+            stmt = stmt.select_from(_CARD_PROJECT_JOIN).where(
+                Project.user_id == self._user_id
             )
         value = await self._session.scalar(stmt)
         return float(value or 0.0)
@@ -138,7 +136,13 @@ class InsightsEngine:
         )
         if self._user_id is not None:
             stmt = stmt.where(Project.user_id == self._user_id)
-        rows = (await self._session.execute(stmt.group_by(Project.id, Project.name).order_by(func.sum(Execution.cost_usd).desc()))).all()
+        rows = (
+            await self._session.execute(
+                stmt.group_by(Project.id, Project.name).order_by(
+                    func.sum(Execution.cost_usd).desc()
+                )
+            )
+        ).all()
         return {
             str(pid): {
                 "name": name,
@@ -149,37 +153,35 @@ class InsightsEngine:
         }
 
     async def _cost_by_agent(self, since: datetime) -> dict[str, dict[str, Any]]:
-        stmt = (
-            select(
-                Execution.agent_name,
-                func.coalesce(func.sum(Execution.cost_usd), 0.0).label("cost"),
-                func.count(Execution.id).label("exec_count"),
-            )
-            .where(Execution.started_at >= since)
-        )
+        stmt = select(
+            Execution.agent_name,
+            func.coalesce(func.sum(Execution.cost_usd), 0.0).label("cost"),
+            func.count(Execution.id).label("exec_count"),
+        ).where(Execution.started_at >= since)
         if self._user_id is not None:
-            stmt = (
-                stmt.select_from(_CARD_PROJECT_JOIN)
-                .where(Project.user_id == self._user_id)
+            stmt = stmt.select_from(_CARD_PROJECT_JOIN).where(
+                Project.user_id == self._user_id
             )
-        rows = (await self._session.execute(stmt.group_by(Execution.agent_name).order_by(func.sum(Execution.cost_usd).desc()))).all()
+        rows = (
+            await self._session.execute(
+                stmt.group_by(Execution.agent_name).order_by(
+                    func.sum(Execution.cost_usd).desc()
+                )
+            )
+        ).all()
         return {
             name: {"cost_usd": round(float(cost), 4), "exec_count": int(cnt)}
             for name, cost, cnt in rows
         }
 
     async def _avg_time_per_phase(self, since: datetime) -> dict[str, float]:
-        stmt = (
-            select(
-                Execution.agent_name,
-                func.avg(Execution.duration_ms).label("avg_ms"),
-            )
-            .where(Execution.started_at >= since)
-        )
+        stmt = select(
+            Execution.agent_name,
+            func.avg(Execution.duration_ms).label("avg_ms"),
+        ).where(Execution.started_at >= since)
         if self._user_id is not None:
-            stmt = (
-                stmt.select_from(_CARD_PROJECT_JOIN)
-                .where(Project.user_id == self._user_id)
+            stmt = stmt.select_from(_CARD_PROJECT_JOIN).where(
+                Project.user_id == self._user_id
             )
         rows = (await self._session.execute(stmt.group_by(Execution.agent_name))).all()
         return {name: round(float(avg_ms or 0.0), 4) for name, avg_ms in rows}
@@ -197,7 +199,6 @@ class InsightsEngine:
         - reversão: cards cujo ``meta`` contém ``review_logs`` (o Reviewer
           reprovou e devolveu o card para 'production' — ciclo Criação↔Revisão).
         """
-        from sqlalchemy.orm import selectinload
 
         card_stmt = select(Card).where(Card.updated_at >= since)
         if self._user_id is not None:
@@ -213,8 +214,10 @@ class InsightsEngine:
         if total == 0:
             return 0.0, 0.0
 
-        auto_stmt = select(func.count()).select_from(Card).where(
-            Card.auto_approved.is_(True), Card.updated_at >= since
+        auto_stmt = (
+            select(func.count())
+            .select_from(Card)
+            .where(Card.auto_approved.is_(True), Card.updated_at >= since)
         )
         if self._user_id is not None:
             auto_stmt = auto_stmt.join(Project, Card.project_id == Project.id).where(

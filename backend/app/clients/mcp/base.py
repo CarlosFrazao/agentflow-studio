@@ -46,7 +46,10 @@ class BaseMCPClient:
     async def health_probe(self) -> bool:
         """Testa conectividade MCP (handshake SSE) sem chamar ferramenta."""
         try:
-            async with sse_client(self._mcp_url, headers=self._extra_headers) as (read, write):
+            async with sse_client(self._mcp_url, headers=self._extra_headers) as (
+                read,
+                write,
+            ):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     await session.close()
@@ -58,12 +61,17 @@ class BaseMCPClient:
     async def call_tool(self, name: str, arguments: dict) -> dict:
         """Chama uma ferramenta MCP e retorna o primeiro conteúdo estruturado."""
         try:
-            async with sse_client(self._mcp_url, headers=self._extra_headers) as (read, write):
+            async with sse_client(self._mcp_url, headers=self._extra_headers) as (
+                read,
+                write,
+            ):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     result = await session.call_tool(name, arguments)
         except Exception as exc:  # conexão recusada, timeout, protocolo
-            logger.warning("mcp_call_failed", url=self._mcp_url, tool=name, error=str(exc))
+            logger.warning(
+                "mcp_call_failed", url=self._mcp_url, tool=name, error=str(exc)
+            )
             raise MCPClientError(f"MCP call '{name}' falhou: {exc}") from exc
 
         if not result.content:

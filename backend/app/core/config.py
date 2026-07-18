@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     # Default: <raiz do repo>/frontend/dist (build de produção do Vite).
     # Para servir o HTML estático legado, aponte para frontend_static.
     static_dir: Path | None = Field(
-        default_factory=lambda: Path(__file__).resolve().parents[3] / "frontend" / "dist"
+        default_factory=lambda: Path(__file__).resolve().parents[3]
+        / "frontend"
+        / "dist"
     )
 
     # Database (SQLite local do MVP)
@@ -160,7 +162,9 @@ class Settings(BaseSettings):
     # Diretório onde os YAML de agentes customizados são persistidos.
     # Default: <raiz do repo>/.claude/skills (conforme CLAUDE.md).
     agents_dir: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parents[3] / ".claude" / "skills"
+        default_factory=lambda: Path(__file__).resolve().parents[3]
+        / ".claude"
+        / "skills"
     )
 
     @model_validator(mode="after")

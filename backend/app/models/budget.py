@@ -14,7 +14,9 @@ class BudgetLimit(Base):
 
     id: Mapped[UUID] = uuid_pk()
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    monthly_limit_usd: Mapped[float] = mapped_column(Float, default=10.0, nullable=False)
+    monthly_limit_usd: Mapped[float] = mapped_column(
+        Float, default=10.0, nullable=False
+    )
     per_project_limit_usd: Mapped[float] = mapped_column(
         Float, default=3.0, nullable=False
     )

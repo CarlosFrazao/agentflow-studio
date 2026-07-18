@@ -4,14 +4,14 @@ Permite CRUD de definições de agentes (YAML/JSON) persistidas em disco e
 espelhadas no SQLite. Segue o envelope padronizado da API.
 """
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_request_id
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError
 from app.core.responses import success_envelope
-from app.schemas.agent import AgentCreate, AgentResponse, AgentUpdate
+from app.schemas.agent import AgentCreate, AgentUpdate
 from app.services import agent_definitions as svc
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -37,9 +37,7 @@ async def create_agent(
     _user=Depends(get_current_user),
 ) -> dict:
     agent = await svc.create_agent(body, session)
-    return success_envelope(
-        data=agent.model_dump(mode="json"), request_id=request_id
-    )
+    return success_envelope(data=agent.model_dump(mode="json"), request_id=request_id)
 
 
 @router.get("/{name}", response_model=None)
@@ -52,9 +50,7 @@ async def get_agent(
     agent = await svc.get_agent_by_name(name, session)
     if agent is None:
         raise NotFoundError("Agent", name)
-    return success_envelope(
-        data=agent.model_dump(mode="json"), request_id=request_id
-    )
+    return success_envelope(data=agent.model_dump(mode="json"), request_id=request_id)
 
 
 @router.put("/{name}", response_model=None)
@@ -68,9 +64,7 @@ async def update_agent(
     agent = await svc.update_agent_by_name(name, body, session)
     if agent is None:
         raise NotFoundError("Agent", name)
-    return success_envelope(
-        data=agent.model_dump(mode="json"), request_id=request_id
-    )
+    return success_envelope(data=agent.model_dump(mode="json"), request_id=request_id)
 
 
 @router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT)

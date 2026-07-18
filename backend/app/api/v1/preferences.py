@@ -12,7 +12,7 @@ Broken Object Level Authorization).
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,7 +36,9 @@ router = APIRouter(prefix="/users", tags=["preferences"])
 APPLY_THRESHOLD = 2
 
 
-@router.post("/{user_id}/preferences", response_model=None, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{user_id}/preferences", response_model=None, status_code=status.HTTP_201_CREATED
+)
 async def reinforce_preference(
     user_id: str,
     body: PreferenceCreate,
@@ -134,9 +136,7 @@ async def edit_preference(
 ) -> dict:
     """Edita o valor de uma preferência (reescreve, mantém histórico de reforço)."""
     pref = await _require_owner(session, user, preference_id)
-    pref = await mutate_preference(
-        session, str(pref.id), "edit", value=body.value
-    )
+    pref = await mutate_preference(session, str(pref.id), "edit", value=body.value)
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)

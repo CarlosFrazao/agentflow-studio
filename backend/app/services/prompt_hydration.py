@@ -103,8 +103,7 @@ _GOVERNANCE_RULES = (
 class TechnicalTranslator(Protocol):
     """Contrato de tradução PT -> EN técnico (injável)."""
 
-    def translate(self, text: str) -> str:
-        ...
+    def translate(self, text: str) -> str: ...
 
 
 def _capitalize_first(text: str) -> str:
@@ -125,9 +124,7 @@ class DeterministicTranslator:
         working = text
         # 1) Frases multi-palavra (case-insensitive, com fronteira de palavra).
         for pt, en in _PHRASES:
-            working = re.sub(
-                rf"\b{re.escape(pt)}\b", en, working, flags=re.IGNORECASE
-            )
+            working = re.sub(rf"\b{re.escape(pt)}\b", en, working, flags=re.IGNORECASE)
 
         # 2) Substituição token a token preservando pontuação e siglas.
         def _sub(match: re.Match[str]) -> str:
@@ -162,9 +159,7 @@ class LLMTranslator:
             return text
         try:
             translated = asyncio.run(
-                self._llm.generate_text(
-                    system_prompt=self._SYSTEM, user_prompt=text
-                )
+                self._llm.generate_text(system_prompt=self._SYSTEM, user_prompt=text)
             )
             cleaned = (translated or "").strip()
             if cleaned:

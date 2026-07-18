@@ -27,6 +27,8 @@ class Snippet(Base, TimestampMixin):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     language: Mapped[str] = mapped_column(String(50), default="text")
     license: Mapped[str] = mapped_column(
-        Enum(*SNIPPET_LICENSES, name="snippet_license"), default="unknown", nullable=False
+        Enum(*SNIPPET_LICENSES, name="snippet_license"),
+        default="unknown",
+        nullable=False,
     )
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)

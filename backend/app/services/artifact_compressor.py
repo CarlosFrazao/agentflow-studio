@@ -77,8 +77,7 @@ def _build_prompts(text: str, summary_budget: int) -> tuple[str, str]:
         f"resumo estruturado. Alvo aproximado: {summary_budget} tokens."
     )
     user_prompt = (
-        "RELATÓRIO A RESUMIR (preserve 'Concorrentes' e 'Gaps'):\n\n"
-        f"{text}"
+        "RELATÓRIO A RESUMIR (preserve 'Concorrentes' e 'Gaps'):\n\n" f"{text}"
     )
     return system_prompt, user_prompt
 

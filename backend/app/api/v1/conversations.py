@@ -248,8 +248,10 @@ async def list_messages(
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    stmt = select(Message).where(Message.conversation_id == conv.id).order_by(
-        Message.created_at.asc(), Message.id.asc()
+    stmt = (
+        select(Message)
+        .where(Message.conversation_id == conv.id)
+        .order_by(Message.created_at.asc(), Message.id.asc())
     )
     messages = (await session.execute(stmt)).scalars().all()
 

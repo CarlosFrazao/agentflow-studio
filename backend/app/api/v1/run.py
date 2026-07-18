@@ -7,9 +7,8 @@ quando confidence >= 0.85 e sem alertas críticos do Reviewer.
 
 from datetime import datetime, timezone, timedelta
 import asyncio
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_owned_card, get_request_id
@@ -22,7 +21,6 @@ from app.services.deps import (
 )
 from app.core.database import get_session
 from app.core.config import get_settings
-from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.responses import success_envelope
 from app.services.learning_memory import LearningMemory
@@ -58,7 +56,6 @@ AUTO_APPROVE_REVERT_WINDOW_MIN = 30
 async def run_card(
     card: Card = Depends(get_owned_card),
     request_id: str = Depends(get_request_id),
-
     session: AsyncSession = Depends(get_session),
     llm=Depends(get_llm),
     sra=Depends(get_sra),
@@ -249,9 +246,9 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, sandbox, sess
                 card=str(card.id),
                 query=card.title,
             )
-            code_out = await CodeResearchAgent(llm=llm, github=github, firecrawl=firecrawl).run(
-                query=card.title, per_page=3
-            )
+            code_out = await CodeResearchAgent(
+                llm=llm, github=github, firecrawl=firecrawl
+            ).run(query=card.title, per_page=3)
             logger.debug(
                 "code_research_done",
                 card=str(card.id),
@@ -261,7 +258,10 @@ async def _dispatch(agent_name, card, llm, sra, firecrawl, github, sandbox, sess
             )
             if code_out.suggestions or code_out.license_class != "unknown":
                 result["extra_artifacts"].append(
-                    {"agent_name": "code_research", "content": code_out.model_dump_json()}
+                    {
+                        "agent_name": "code_research",
+                        "content": code_out.model_dump_json(),
+                    }
                 )
         except Exception as exc:
             # Code Research é complementar: nunca derruba o Research.

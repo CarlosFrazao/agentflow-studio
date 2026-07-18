@@ -47,7 +47,9 @@ class GitHubClient:
             headers["Authorization"] = f"Bearer {self._token}"
         return headers
 
-    async def _request(self, method: str, url: str, *, retry_kwargs: dict | None = None, **kwargs) -> httpx.Response:
+    async def _request(
+        self, method: str, url: str, *, retry_kwargs: dict | None = None, **kwargs
+    ) -> httpx.Response:
         """Executa request HTTP com retry de falhas transitórias (429/5xx/timeout).
 
         Circuit breaker cobre falhas persistentes; aqui só suavizamos picos
@@ -65,7 +67,14 @@ class GitHubClient:
 
         return await with_retry(_do, **(retry_kwargs or {}))
 
-    async def get_file(self, repo: str, path: str, ref: str = "main", *, retry_kwargs: dict | None = None) -> str:
+    async def get_file(
+        self,
+        repo: str,
+        path: str,
+        ref: str = "main",
+        *,
+        retry_kwargs: dict | None = None,
+    ) -> str:
         """Lê arquivo bruto (ex: LICENSE, README.md) via Contents API."""
         if self._breaker.is_open():
             raise GitHubUnavailableError("circuit_breaker_open")
@@ -73,7 +82,9 @@ class GitHubClient:
         try:
             import base64
 
-            resp = await self._request("GET", url, retry_kwargs=retry_kwargs, headers=self._headers())
+            resp = await self._request(
+                "GET", url, retry_kwargs=retry_kwargs, headers=self._headers()
+            )
             data = resp.json()
             return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
         except (httpx.HTTPError, httpx.TimeoutException, KeyError, ValueError) as exc:
@@ -82,7 +93,9 @@ class GitHubClient:
         else:
             self._breaker.record_success()
 
-    async def search_repos(self, query: str, per_page: int = 15, *, retry_kwargs: dict | None = None) -> list[dict]:
+    async def search_repos(
+        self, query: str, per_page: int = 15, *, retry_kwargs: dict | None = None
+    ) -> list[dict]:
         if self._breaker.is_open():
             raise GitHubUnavailableError("circuit_breaker_open")
         url = f"{self._base}/search/repositories"

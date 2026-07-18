@@ -22,9 +22,7 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # o usuario nao existe (mitiga timing oracle de enumeracao de emails em /auth/login).
 # Gerado com um segredo aleatorio descartavel; existe apenas para consumir o mesmo
 # tempo de CPU de um verify() real, nunca e comparado com senha valida.
-_DUMMY_PASSWORD_HASH = (
-    "$2b$12$05gdANFgsm0SSzlaKBsbxuo.XrWP3bPYKbd/ZtVtOYElPZyiG7LlK"
-)
+_DUMMY_PASSWORD_HASH = "$2b$12$05gdANFgsm0SSzlaKBsbxuo.XrWP3bPYKbd/ZtVtOYElPZyiG7LlK"
 
 
 def hash_password(password: str) -> str:
