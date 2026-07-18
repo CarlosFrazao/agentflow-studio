@@ -67,12 +67,20 @@ def _mount_static(app: FastAPI) -> None:
 
     index_file = static_dir / "index.html"
 
+    static_resolved = static_dir.resolve()
+
     @app.get("/{full_path:path}")
     async def _spa_fallback(full_path: str) -> Response:
         # /api/* é tratado pelos routers (nunca chega aqui por causa do prefixo).
-        # Se o arquivo solicitado existir no build, serve ele; senão, index.html.
-        candidate = static_dir / full_path
-        if full_path and candidate.is_file():
+        # Se o arquivo solicitado existir DENTRO do build, serve ele; senão, index.html.
+        # Resolve o caminho e garante que continua dentro de static_dir para evitar
+        # path traversal (ex.: /../../../backend/.env).
+        candidate = (static_dir / full_path).resolve()
+        if (
+            full_path
+            and candidate.is_relative_to(static_resolved)
+            and candidate.is_file()
+        ):
             return FileResponse(str(candidate))
         if index_file.exists():
             return FileResponse(str(index_file))
