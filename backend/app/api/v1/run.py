@@ -164,6 +164,13 @@ async def run_card(
         card.revert_deadline = finished + timedelta(
             minutes=AUTO_APPROVE_REVERT_WINDOW_MIN
         )
+    else:
+        # Audit BUG-005: limpa flag de auto-approve se o agente reprovar
+        # (ex.: Reviewer com alertas críticos após ciclo review->dev).
+        # Sem isso, o card ficaria "auto_approved" zombie indevidamente.
+        card.auto_approved = False
+        card.approval_by = "none"
+        card.revert_deadline = None
     await session.commit()
     await session.refresh(card)
 

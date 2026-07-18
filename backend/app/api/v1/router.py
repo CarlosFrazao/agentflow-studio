@@ -18,7 +18,6 @@ from app.api.v1 import (
     share,
     share_ws,
     snippets,
-    users,
 )
 from app.api.v1.deps import get_current_user
 
@@ -30,9 +29,6 @@ router.include_router(auth.router)
 router.include_router(share.router)
 router.include_router(share_ws.router)
 # Protegidos por JWT.
-router.include_router(
-    users.router, dependencies=[Depends(get_current_user)]
-)
 router.include_router(
     projects.router, dependencies=[Depends(get_current_user)]
 )

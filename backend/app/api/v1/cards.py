@@ -157,8 +157,9 @@ async def update_card(
         card.order_index = body.order_index
     if body.confidence_score is not None:
         card.confidence_score = body.confidence_score
-    if body.approval_by is not None:
-        card.approval_by = body.approval_by
+    # NOTA: `approval_by`/`auto_approved` sao intencionalmente IGNORADOS aqui
+    # (Audit BUG-006). So podem ser definidos via /run (auto-approve ADR-007)
+    # ou /revert-approval. O schema CardUpdate nem expoe esses campos.
     if body.meta is not None:
         card.meta = _deep_merge_meta(card.meta or {}, body.meta)
     await session.commit()

@@ -28,11 +28,14 @@ class CardCreate(BaseModel):
 
 
 class CardUpdate(BaseModel):
+    # NOTA: `approval_by` e `auto_approved` SÃO INTENCIONALMENTE OMITIDOS.
+    # Eles só podem ser definidos via /run (auto-approve ADR-007) ou
+    # /revert-approval, nunca por PATCH direto (mitiga falsificação de
+    # auto-approve pelo cliente — Audit BUG-006).
     title: str | None = Field(default=None, min_length=1, max_length=300)
     column: str | None = None
     order_index: int | None = None
     confidence_score: float | None = Field(default=None, ge=0.0, le=1.0)
-    approval_by: str | None = None
     meta: dict | None = None
 
 

@@ -37,11 +37,14 @@ async def test_dashboard_lists_recent_executions(client: AsyncClient) -> None:
 
 
 async def test_dashboard_spend_vs_limit_ratio(client: AsyncClient) -> None:
-    uid = (
-        await client.post(
-            "/api/v1/users", json={"email": "d@ex.com", "display_name": "D"}
-        )
-    ).json()["data"]["id"]
+    # O router /users (CRUD de User) foi removido no FEAT-C001 (mitiga IDOR
+    # em massa). O user e' criado via /auth/register; o budget (/users/{id}/budget)
+    # continua montado e e' usado aqui para semear o gasto.
+    reg = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "d@ex.com", "display_name": "D", "password": "x12345678"},
+    )
+    uid = reg.json()["data"]["user"]["id"]
     await client.put(
         f"/api/v1/users/{uid}/budget",
         json={"monthly_limit_usd": 10.0, "per_project_limit_usd": 3.0,
