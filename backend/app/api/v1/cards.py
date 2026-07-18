@@ -64,15 +64,18 @@ async def create_card(
     )
     if hydrated:
         meta["hydrated_prompt"] = hydrated
+    # Security (FEAT-006): auto-approve fields are NEVER client-controlled.
+    # A freshly created card must always start as not auto-approved so the
+    # Human-in-the-Loop gate (POST /run) remains the only path that sets them.
     card = Card(
         project_id=body.project_id,
         title=body.title,
         column=body.column,
         order_index=body.order_index,
         confidence_score=body.confidence_score,
-        approval_by=body.approval_by,
-        auto_approved=body.auto_approved,
-        revert_deadline=body.revert_deadline,
+        approval_by="none",
+        auto_approved=False,
+        revert_deadline=None,
         meta=meta,
     )
     session.add(card)

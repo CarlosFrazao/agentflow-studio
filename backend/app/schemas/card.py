@@ -9,14 +9,16 @@ from app.models.card import KANBAN_COLUMNS
 
 
 class CardCreate(BaseModel):
+    # NOTE: `approval_by`, `auto_approved` and `revert_deadline` are intentionally
+    # OMITTED. They are server-controlled only — set via POST /run (auto-approve
+    # ADR-007) or /revert-approval. Accepting them on create would let a client
+    # forge an auto-approved card and bypass the Human-in-the-Loop gate
+    # (Audit BUG-006 / FEAT-006).
     project_id: UUID
     title: str = Field(min_length=1, max_length=300)
     column: str = "backlog"
     order_index: int = 0
     confidence_score: float = 0.0
-    approval_by: str = "none"
-    auto_approved: bool = False
-    revert_deadline: datetime | None = None
     meta: dict = Field(default_factory=dict)
 
     @field_validator("column")
