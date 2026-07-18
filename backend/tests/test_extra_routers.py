@@ -7,10 +7,14 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _create_user(client: AsyncClient) -> str:
+    # FEAT-C001: router /users (CRUD de User) removido para eliminar IDOR.
+    # Usuarios sao criados via /auth/register (envelope {data: {user: {id}}}).
     resp = await client.post(
-        "/api/v1/users", json={"email": "u@ex.com", "display_name": "U"}
+        "/api/v1/auth/register",
+        json={"email": "u@ex.com", "display_name": "U", "password": "secret123"},
     )
-    return resp.json()["data"]["id"]
+    assert resp.status_code == 201, resp.text
+    return resp.json()["data"]["user"]["id"]
 
 
 # ---- F-009 Snippets ----
