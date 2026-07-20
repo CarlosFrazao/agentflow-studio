@@ -20,6 +20,7 @@ import re
 import sqlite3
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -161,6 +162,7 @@ async def mutate_preference(
     action: str,
     *,
     value: str | None = None,
+    user_id: UUID | str | None = None,
 ) -> UserPreference:
     """Edita ou remove (arquiva recuperável) uma preferência.
 
@@ -168,10 +170,23 @@ async def mutate_preference(
     - ``remove`` : arquiva (``archived=True``) — não apaga o histórico físico;
       restaure com ``action="restore"``.
 
+    Defense-in-depth (FEAT-001 / B9-3): quando ``user_id`` é informado, a
+    preferência só é mutada se ``pref.user_id`` coincidir; caso contrário levanta
+    ``NotFoundError`` (não vaza a existência do recurso de terceiros — anti-IDOR).
+
     Levanta ``NotFoundError`` se a preferência não existir.
     """
     pref = await db_session.get(UserPreference, _coerce_uuid(preference_id))
     if pref is None:
+        raise NotFoundError("UserPreference", preference_id)
+
+    if user_id is not None and UUID(str(pref.user_id)) != UUID(str(user_id)):
+        logger.warning(
+            "preference_owner_mismatch",
+            id=str(pref.id),
+            expected=str(user_id),
+            actual=str(pref.user_id),
+        )
         raise NotFoundError("UserPreference", preference_id)
 
     action = action.lower()

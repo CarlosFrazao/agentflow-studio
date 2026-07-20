@@ -93,3 +93,32 @@ async def test_preferences_own_roundtrip(client, session_factory):
     assert listed.status_code == 200
     items = listed.json()["data"]
     assert any(p["id"] == created["id"] for p in items)
+
+
+async def test_preferences_cross_user_patch_isolated(client, session_factory):
+    """FEAT-001 integration (tenant isolation): A's token never affects B's pref.
+
+    B owns a preference; A (logged in) PATCHes it via the real endpoint. The
+    engine's defense-in-depth must reject with 404 and leave B's resource
+    untouched — exercising the new user_id check inside mutate_preference.
+    """
+    a = await _register(client, "feat001-pa@example.com")
+    b = await _register(client, "feat001-pb@example.com")
+    b_pref = await _add_pref(client, b, "language", "pt-BR", session_factory)
+    pid = b_pref["id"]
+
+    # A is authenticated and attempts to edit B's preference.
+    await _login_as(client, a, session_factory)
+    resp = await client.patch(
+        f"{API}/users/{b}/preferences/{pid}",
+        json={"value": "pt-BR hijacked by A"},
+    )
+    assert resp.status_code == 404  # ownership denied, no leak
+
+    # B's preference is unchanged.
+    await _login_as(client, b, session_factory)
+    listed = await client.get(f"{API}/users/{b}/preferences")
+    items = listed.json()["data"]
+    target = next(p for p in items if p["id"] == pid)
+    assert target["value"] == "pt-BR"
+

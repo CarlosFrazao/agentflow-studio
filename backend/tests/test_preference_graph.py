@@ -186,3 +186,46 @@ async def test_mutate_edit_empty_value_raises_validation_error(session_factory):
     async with session_factory() as s:
         with pytest.raises(ValidationError):
             await mutate_preference(s, str(pid), "edit", value="   ")
+
+
+async def test_mutate_cross_user_raises_not_found(session_factory):
+    """FEAT-001 (B9-3): user A cannot mutate a preference owned by user B.
+
+    Gherkin 4.1.2 — `Dado` uma preferência de outro usuário, `Quando`
+    `mutate_preference` é chamado com esse id e `user_id` diferente, `Então`
+    levanta `NotFoundError`.
+    """
+    async with session_factory() as s:
+        owner = await _make_user(s, "owner@example.com")
+        other = await _make_user(s, "intruder@example.com")
+        prefs = await _seed_prefs(s, owner.id, [("language", "pt-BR", 3)])
+        pid = prefs[0].id
+
+    # Intruder calls mutate with owner's preference id but its own user_id.
+    async with session_factory() as s:
+        with pytest.raises(NotFoundError):
+            await mutate_preference(
+                s, str(pid), "edit", value="hijacked", user_id=other.id
+            )
+        # Resource of the victim is untouched.
+        raw = await s.get(UserPreference, pid)
+        assert raw.value == "pt-BR"
+        assert raw.archived is False
+
+
+async def test_mutate_null_user_id_raises_not_found(session_factory):
+    """FEAT-001 edge case: calling the engine without owner match fails.
+
+    Gherkin 4.1.3 — user_id nulo/incompatível → NotFoundError (dono não casado).
+    """
+    async with session_factory() as s:
+        user = await _make_user(s)
+        prefs = await _seed_prefs(s, user.id, [("language", "pt-BR", 3)])
+        pid = prefs[0].id
+
+    async with session_factory() as s:
+        with pytest.raises(NotFoundError):
+            await mutate_preference(
+                s, str(pid), "edit", value="x", user_id=uuid4()
+            )
+

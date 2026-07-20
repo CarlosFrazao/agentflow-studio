@@ -136,7 +136,9 @@ async def edit_preference(
 ) -> dict:
     """Edita o valor de uma preferência (reescreve, mantém histórico de reforço)."""
     pref = await _require_owner(session, user, preference_id)
-    pref = await mutate_preference(session, str(pref.id), "edit", value=body.value)
+    pref = await mutate_preference(
+        session, str(pref.id), "edit", value=body.value, user_id=user.id
+    )
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)
@@ -152,7 +154,7 @@ async def archive_preference(
 ) -> dict:
     """Remove (arquiva recuperável) uma preferência — não apaga o histórico físico."""
     pref = await _require_owner(session, user, preference_id)
-    pref = await mutate_preference(session, str(pref.id), "remove")
+    pref = await mutate_preference(session, str(pref.id), "remove", user_id=user.id)
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)
@@ -168,7 +170,7 @@ async def restore_preference(
 ) -> dict:
     """Restaura uma preferência arquivada (reverte o arquivamento)."""
     pref = await _require_owner(session, user, preference_id)
-    pref = await mutate_preference(session, str(pref.id), "restore")
+    pref = await mutate_preference(session, str(pref.id), "restore", user_id=user.id)
     data = PreferenceResponse.model_validate(pref).model_dump(mode="json")
     data["applied"] = pref.confidence_count >= APPLY_THRESHOLD
     return success_envelope(data=data, request_id=request_id)
