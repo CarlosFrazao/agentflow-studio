@@ -58,6 +58,21 @@ def ws_app():
 
     loop.run_until_complete(_schema())
 
+    # O schema já veio do create_all acima; desativa o init_db() do lifespan
+    # (que rodaria `alembic upgrade head` e reaplicaria a migration 0004,
+    # gerando "duplicate column name: user_id"). Mantém o app íntegro para o WS.
+    import app.core.database as _db
+    import app.main as _main
+
+    _orig_init_db_db = _db.init_db
+    _orig_init_db_main = _main.init_db
+
+    async def _noop_init_db() -> None:
+        return None
+
+    _db.init_db = _noop_init_db  # type: ignore[assignment]
+    _main.init_db = _noop_init_db  # type: ignore[assignment]
+
     app = create_app()
     app.state._test_db_path = path
     app.state._test_db_restore = (db_core, orig_engine, orig_factory)
@@ -66,6 +81,8 @@ def ws_app():
     # Cleanup
     db_core.engine = orig_engine
     db_core.AsyncSessionFactory = orig_factory
+    _db.init_db = _orig_init_db_db  # type: ignore[assignment]
+    _main.init_db = _orig_init_db_main  # type: ignore[assignment]
     try:
         os.unlink(path)
     except OSError:

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_session
 from app.core.exceptions import ConflictError, UnauthorizedError
-from app.api.v1.deps import get_current_user_id, get_request_id
+from app.api.v1.deps import get_request_id
 from app.core.responses import success_envelope
 from app.core.security import (
     create_access_token,
