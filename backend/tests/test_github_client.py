@@ -11,6 +11,7 @@ import pytest
 
 from app.clients.github_client import GitHubClient, GitHubUnavailableError
 from app.core.config import get_settings
+from app.core.exceptions import ValidationError
 
 pytestmark = pytest.mark.asyncio
 
@@ -92,6 +93,31 @@ async def test_get_file_does_not_retry_client_error() -> None:
     with pytest.raises(GitHubUnavailableError):
         await client.get_file("o/r", "x", retry_kwargs=_retry_fast())
     assert calls["n"] == 1  # erro 4xx não retenta
+
+
+# ---- Whitelist de path/ref (B6-1) ----
+async def test_get_file_rejects_path_traversal() -> None:
+    client = _client_with(lambda request: httpx.Response(200, json={}))
+    with pytest.raises(ValidationError):
+        await client.get_file("owner/repo", "../secret.txt")
+
+
+async def test_get_file_rejects_path_with_control_chars() -> None:
+    client = _client_with(lambda request: httpx.Response(200, json={}))
+    with pytest.raises(ValidationError):
+        await client.get_file("owner/repo", "src/../../../etc/passwd")
+
+
+async def test_get_file_rejects_invalid_ref() -> None:
+    client = _client_with(lambda request: httpx.Response(200, json={}))
+    with pytest.raises(ValidationError):
+        await client.get_file("owner/repo", "LICENSE", ref="main;rm -rf /")
+
+
+async def test_get_file_rejects_invalid_repo() -> None:
+    client = _client_with(lambda request: httpx.Response(200, json={}))
+    with pytest.raises(ValidationError):
+        await client.get_file("repo-sem-dono", "LICENSE")
 
 
 def _retry_fast() -> dict:

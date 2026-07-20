@@ -3,8 +3,10 @@
 Cobrem refresh tokens e decode de access token (lógica pura).
 """
 
+import jwt as _jwt
 import pytest
 
+from app.core import security as security_mod
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -18,6 +20,43 @@ from app.core.security import (
 def test_access_token_roundtrip() -> None:
     tok = create_access_token("user-123")
     assert decode_access_token(tok) == "user-123"
+
+
+def test_access_token_emits_iss_and_aud() -> None:
+    tok = create_access_token("user-123")
+    payload = _jwt.decode(
+        tok,
+        security_mod.settings.jwt_secret,
+        algorithms=[security_mod.settings.jwt_algorithm],
+        options={"verify_aud": False, "verify_iss": False},
+    )
+    assert payload["iss"] == security_mod.settings.jwt_issuer
+    assert payload["aud"] == security_mod.settings.jwt_audience
+
+
+def test_decode_rejects_token_without_iss_or_aud() -> None:
+    payload = {"sub": "user-123", "type": "access"}
+    bad = _jwt.encode(
+        payload,
+        security_mod.settings.jwt_secret,
+        algorithm=security_mod.settings.jwt_algorithm,
+    )
+    assert decode_access_token(bad) is None
+
+
+def test_decode_rejects_wrong_audience() -> None:
+    payload = {
+        "sub": "user-123",
+        "type": "access",
+        "iss": security_mod.settings.jwt_issuer,
+        "aud": "some-other-audience",
+    }
+    bad = _jwt.encode(
+        payload,
+        security_mod.settings.jwt_secret,
+        algorithm=security_mod.settings.jwt_algorithm,
+    )
+    assert decode_access_token(bad) is None
 
 
 def test_access_token_invalid_returns_none() -> None:

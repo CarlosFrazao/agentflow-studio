@@ -140,6 +140,10 @@ class Settings(BaseSettings):
     # Nunca versionar um secret conhecido — remover qualquer default inseguro.
     jwt_secret: str | None = None
     jwt_algorithm: str = "HS256"
+    # iss/aud fixos do emissor — protegem contra replay de tokens de outra
+    # aplicação que compartilhe o mesmo secret (B1-2). Validados no decode.
+    jwt_issuer: str = "agentflow-studio"
+    jwt_audience: str = "agentflow-studio-api"
     access_token_ttl_minutes: int = Field(default=60, gt=0)
     refresh_token_ttl_days: int = Field(default=30, gt=0)
     bcrypt_rounds: int = Field(default=12, ge=4, le=15)

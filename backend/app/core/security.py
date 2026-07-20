@@ -51,7 +51,8 @@ def create_access_token(subject: str | UUID, ttl_minutes: int | None = None) -> 
     """Cria um JWT HS256 cujo `sub` é o user id.
 
     ttl_minutes=None usa settings.access_token_ttl_minutes; valores negativos
-    geram token já expirado (usado nos testes de guarda).
+    geram token já expirado (usado nos testes de guarda). Define iss/aud
+    fixos do emissor (B1-2) para rejeitar tokens de outras aplicações.
     """
     ttl = settings.access_token_ttl_minutes if ttl_minutes is None else ttl_minutes
     now = datetime.now(tz=timezone.utc)
@@ -61,15 +62,24 @@ def create_access_token(subject: str | UUID, ttl_minutes: int | None = None) -> 
         "iat": now,
         "exp": expire,
         "type": "access",
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> str | None:
-    """Decodifica o JWT e retorna o `sub` (user id) ou None se inválido/expirado."""
+    """Decodifica o JWT e retorna o `sub` (user id) ou None se inválido/expirado.
+
+    Rejeita tokens sem `type=access` ou com iss/aud divergentes do emissor (B1-2).
+    """
     try:
         payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
         )
     except JWTError:
         return None
@@ -83,7 +93,7 @@ def create_refresh_token(subject: str | UUID, ttl_days: int | None = None) -> st
     """Cria um JWT HS256 do tipo `refresh` (rotação de sessão).
 
     ttl_days=None usa settings.refresh_token_ttl_days. Vida longa: permite
-    renovar o access token sem novo login.
+    renovar o access token sem novo login. Define iss/aud fixos do emissor (B1-2).
     """
     ttl = settings.refresh_token_ttl_days if ttl_days is None else ttl_days
     now = datetime.now(tz=timezone.utc)
@@ -93,15 +103,24 @@ def create_refresh_token(subject: str | UUID, ttl_days: int | None = None) -> st
         "iat": now,
         "exp": expire,
         "type": "refresh",
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def decode_refresh_token(token: str) -> str | None:
-    """Decodifica o refresh token e retorna o `sub` ou None se inválido/expirado."""
+    """Decodifica o refresh token e retorna o `sub` ou None se inválido/expirado.
+
+    Rejeita tokens sem `type=refresh` ou com iss/aud divergentes do emissor (B1-2).
+    """
     try:
         payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
         )
     except JWTError:
         return None

@@ -7,6 +7,7 @@ Resilience (http-request-mastery): circuit breaker para degradação graciosa +
 retry com backoff exponencial/jitter para falhas transitórias (408/429/5xx).
 """
 
+import re
 from collections.abc import Callable
 
 import httpx
@@ -14,9 +15,33 @@ import httpx
 from app.clients.circuit_breaker import CircuitBreaker
 from app.clients.retry import with_retry
 from app.core.config import Settings, get_settings
+from app.core.exceptions import ValidationError
 from app.core.logging import get_logger
 
 logger = get_logger("github_client")
+
+# Allow-list para path/ref da Contents API (B6-1): bloqueia path traversal
+# (../, //), caracteres de controle e refs fora do conjunto seguro (branch/tag/sha).
+_SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
+_SAFE_REF_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
+
+
+def _validate_repo_path_ref(repo: str, path: str, ref: str) -> None:
+    """Rejeita repo/path/ref que não casem com a allow-list segura.
+
+    Levanta ValidationError (422) antes de qualquer interpolação na URL.
+    """
+    if not repo or "/" not in repo:
+        raise ValidationError("repo deve ter o formato 'owner/name'")
+    if not _SAFE_PATH_RE.match(path):
+        raise ValidationError(f"path invalido (caracteres nao permitidos): {path}")
+    if not _SAFE_REF_RE.match(ref):
+        raise ValidationError(f"ref invalido (caracteres nao permitidos): {ref}")
+    # Defesa extra contra traversal óbvio que escape ao allow-list por regex.
+    if ".." in path or "//" in path:
+        raise ValidationError(f"path invalido (traversal detectado): {path}")
+    if ".." in ref or "//" in ref:
+        raise ValidationError(f"ref invalido (traversal detectado): {ref}")
 
 
 class GitHubUnavailableError(Exception):
@@ -78,6 +103,7 @@ class GitHubClient:
         """Lê arquivo bruto (ex: LICENSE, README.md) via Contents API."""
         if self._breaker.is_open():
             raise GitHubUnavailableError("circuit_breaker_open")
+        _validate_repo_path_ref(repo, path, ref)
         url = f"{self._base}/repos/{repo}/contents/{path}?ref={ref}"
         try:
             import base64
