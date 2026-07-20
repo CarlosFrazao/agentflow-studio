@@ -13,7 +13,11 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from app.api.v1.deps import get_current_user, get_owned_card, get_request_id
+from app.api.v1.deps import (
+    get_current_user,
+    get_owned_card,
+    get_request_id,
+)
 from app.core.responses import paginated_envelope, success_envelope
 from app.models.card import KANBAN_COLUMNS, Card
 from app.models.project import Project
@@ -50,8 +54,13 @@ async def create_card(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    # FEAT-007 (B2-1): revalidação defense-in-depth de ownership. `Project.user_id`
+    # é nullable (models/project.py:16) — um project órfão (user_id=None) NÃO
+    # pode aceitar cards de qualquer usuário autenticado (escalada de tenant).
+    # A comparação `project.user_id != user.id` cobre ambos os casos: inexistente
+    # (project is None) e órfão (user_id is None != user.id), rejeitando com 422.
     project = await session.get(Project, body.project_id)
-    if not project or project.user_id != user.id:
+    if project is None or project.user_id != user.id:
         raise ValidationError("project_id invalido ou inexistente")
     # Item C: hidrata o título do usuário (PT informal -> EN técnico + regras).
     # llm=None mantém o caminho síncrono determinístico (zero I/O) neste
