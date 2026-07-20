@@ -13,7 +13,11 @@ logger = get_logger("modal_sandbox")
 
 
 class ModalSandbox(SandboxBackend):
-    """Executa código em um Modal sandbox."""
+    """Executa código em um Modal sandbox sem acesso de rede.
+
+    `network_access=False` no `@app.function` bloqueia tráfego de saída,
+    equivalente a `--network none` do Docker (B7-2).
+    """
 
     name = "modal"
 
@@ -30,7 +34,14 @@ class ModalSandbox(SandboxBackend):
             image = modal.Image.debian_slim().pip_install("pytest")
             app = modal.App.lookup("agentflow-sandbox", create_if_missing=True)
 
-            @app.function(image=image)
+            @app.function(
+                image=image,
+                # Defense-in-depth: `network_access=False` blocks outbound
+                # network from the sandbox container, equivalent to docker's
+                # `--network none`. Generated code cannot exfiltrate data or
+                # reach internal services (B7-2).
+                network_access=False,
+            )
             async def _run(src: str) -> dict:
                 import subprocess
                 import tempfile
