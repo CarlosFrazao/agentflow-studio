@@ -94,9 +94,9 @@ async def override_llm(
 
     Injeta um LLM fake que força revise_artifact em pedidos de mudança,
     tornando o E2E determinístico sem dependência do LLM real. Não exposto
-    em produção (settings.debug=False).
+    em produção (settings.debug=False AND settings.is_production=False).
     """
-    if not get_settings().debug:
+    if not (get_settings().debug and not get_settings().is_production):
         raise NotFoundError("Endpoint", "_override_llm (debug only)")
     set_service_overrides(request, llm=_ReviseLLM())
     return success_envelope(data={"overridden": True}, request_id=request_id)
@@ -113,9 +113,10 @@ async def seed_auto_approved_card(
 
     Cria um card em 'done', com auto_approved=True e revert_deadline dentro da
     janela de 30 minutos, e o vincula à conversa. Permite validar o
-    revert_approval pelo chat sem rodar o pipeline caro (LLM+MCP). Só em debug.
+    revert_approval pelo chat sem rodar o pipeline caro (LLM+MCP). Só em debug
+    (settings.debug=True AND settings.is_production=False).
     """
-    if not get_settings().debug:
+    if not (get_settings().debug and not get_settings().is_production):
         raise NotFoundError("Endpoint", "_seed_auto_approved (debug only)")
 
     from datetime import datetime, timedelta, timezone
