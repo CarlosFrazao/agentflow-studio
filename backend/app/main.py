@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 
+from app.api.v1.deps import get_request_id
 from app.api.v1.router import router as v1_router
 from app.core.config import get_settings
 from app.core.database import close_db, init_db
@@ -91,26 +92,29 @@ def _mount_static(app: FastAPI) -> None:
 
 def _register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(NotFoundError)
-    async def not_found_handler(_: Request, exc: NotFoundError) -> JSONResponse:
+    async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+        request_id = get_request_id(request)
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content=error_envelope(exc.code, exc.message, request_id=""),
+            content=error_envelope(exc.code, exc.message, request_id=request_id),
         )
 
     @app.exception_handler(AppError)
-    async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        request_id = get_request_id(request)
         return JSONResponse(
             status_code=exc.http_status,
-            content=error_envelope(exc.code, exc.message, request_id=""),
+            content=error_envelope(exc.code, exc.message, request_id=request_id),
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
-        logger.error("unhandled_exception", error=str(exc))
+    async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+        request_id = get_request_id(request)
+        logger.error("unhandled_exception", error=str(exc), request_id=request_id)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=error_envelope(
-                "INTERNAL_ERROR", "Erro interno nao esperado", request_id=""
+                "INTERNAL_ERROR", "Erro interno nao esperado", request_id=request_id
             ),
         )
 
