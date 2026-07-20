@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -44,5 +45,6 @@ class AgentResponse(AgentBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: UUID | None
     created_at: datetime
     updated_at: datetime

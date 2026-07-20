@@ -11,6 +11,7 @@ from app.api.v1.deps import get_current_user, get_request_id
 from app.core.database import get_session
 from app.core.exceptions import NotFoundError
 from app.core.responses import success_envelope
+from app.models.user import User
 from app.schemas.agent import AgentCreate, AgentUpdate
 from app.services import agent_definitions as svc
 
@@ -34,9 +35,9 @@ async def create_agent(
     body: AgentCreate,
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
-    _user=Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    agent = await svc.create_agent(body, session)
+    agent = await svc.create_agent(body, session, user_id=user.id)
     return success_envelope(data=agent.model_dump(mode="json"), request_id=request_id)
 
 
@@ -59,9 +60,11 @@ async def update_agent(
     body: AgentUpdate,
     request_id: str = Depends(get_request_id),
     session: AsyncSession = Depends(get_session),
-    _user=Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    agent = await svc.update_agent_by_name(name, body, session)
+    agent = await svc.update_agent_by_name(
+        name, body, session, requester_id=user.id
+    )
     if agent is None:
         raise NotFoundError("Agent", name)
     return success_envelope(data=agent.model_dump(mode="json"), request_id=request_id)
@@ -71,6 +74,8 @@ async def update_agent(
 async def delete_agent(
     name: str,
     session: AsyncSession = Depends(get_session),
-    _user=Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> None:
-    await svc.delete_agent_by_name(name, session)
+    removed = await svc.delete_agent_by_name(name, session, requester_id=user.id)
+    if not removed:
+        raise NotFoundError("Agent", name)

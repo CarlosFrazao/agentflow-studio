@@ -12,8 +12,9 @@ o registro no banco ainda é feito e o erro é logado (nunca silenciado).
 from pathlib import Path
 
 import yaml
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -54,7 +55,9 @@ def _write_yaml(agent: AgentModel) -> None:
         logger.error("agent_yaml_write_failed", name=agent.name, error=str(exc))
 
 
-async def create_agent(body: AgentCreate, session: AsyncSession) -> AgentResponse:
+async def create_agent(
+    body: AgentCreate, session: AsyncSession, user_id: UUID | None = None
+) -> AgentResponse:
     existing = (
         await session.scalars(select(AgentModel).where(AgentModel.name == body.name))
     ).first()
@@ -68,6 +71,7 @@ async def create_agent(body: AgentCreate, session: AsyncSession) -> AgentRespons
         system_prompt=body.system_prompt,
         allowed_tools=body.allowed_tools,
         max_tokens_budget=body.max_tokens_budget,
+        user_id=user_id,
     )
     session.add(agent)
     await session.commit()
@@ -89,11 +93,22 @@ async def get_agent_by_name(name: str, session: AsyncSession) -> AgentResponse |
 
 
 async def update_agent_by_name(
-    name: str, body: AgentUpdate, session: AsyncSession
+    name: str,
+    body: AgentUpdate,
+    session: AsyncSession,
+    requester_id: UUID | None = None,
 ) -> AgentResponse | None:
-    agent = (
-        await session.scalars(select(AgentModel).where(AgentModel.name == name))
-    ).first()
+    """Atualiza o agente se ele existir E pertencer ao requester (ou for shared).
+
+    `requester_id=None` preserva o comportamento legado (sem gate) — usado por
+    testes unitários e callers internos que já garantiram autorização.
+    """
+    stmt = select(AgentModel).where(AgentModel.name == name)
+    if requester_id is not None:
+        stmt = stmt.where(
+            or_(AgentModel.user_id == requester_id, AgentModel.user_id.is_(None))
+        )
+    agent = (await session.scalars(stmt)).first()
     if agent is None:
         return None
     if body.model is not None:
@@ -110,14 +125,25 @@ async def update_agent_by_name(
     return AgentResponse.model_validate(agent)
 
 
-async def delete_agent_by_name(name: str, session: AsyncSession) -> None:
-    agent = (
-        await session.scalars(select(AgentModel).where(AgentModel.name == name))
-    ).first()
+async def delete_agent_by_name(
+    name: str, session: AsyncSession, requester_id: UUID | None = None
+) -> bool:
+    """Remove o agente se ele existir E pertencer ao requester (ou for shared).
+
+    Retorna True se removeu, False se não encontrou (ou não é do requester).
+    `requester_id=None` preserva o comportamento legado (sem gate).
+    """
+    stmt = select(AgentModel).where(AgentModel.name == name)
+    if requester_id is not None:
+        stmt = stmt.where(
+            or_(AgentModel.user_id == requester_id, AgentModel.user_id.is_(None))
+        )
+    agent = (await session.scalars(stmt)).first()
     if agent is None:
-        return
+        return False
     await session.delete(agent)
     await session.commit()
     yaml_file = _yaml_path(_slug(name))
     if yaml_file.exists():
         yaml_file.unlink()
+    return True
