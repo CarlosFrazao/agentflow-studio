@@ -22,7 +22,7 @@ from app.services.deps import (
 from app.core.database import get_session
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.core.responses import success_envelope
+from app.core.responses import sanitize_error, success_envelope
 from app.services.learning_memory import LearningMemory
 from app.models.artifact import Artifact
 from app.models.card import Card
@@ -107,7 +107,12 @@ async def run_card(
         except Exception as lesson_exc:
             logger.warning("record_lesson_failed", error=str(lesson_exc))
         return success_envelope(
-            data={"status": "failed", "agent": agent_name, "error": str(exc)},
+            data={
+                "status": "failed",
+                "agent": agent_name,
+                "error": sanitize_error(exc),
+                "request_id": request_id,
+            },
             request_id=request_id,
         )
 

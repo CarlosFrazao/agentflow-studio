@@ -41,7 +41,27 @@ async def test_run_agent_failure_returns_failed(client, monkeypatch) -> None:
     _, cid = await _seed_card_in_column(client, "backlog")
     resp = await client.post(f"/api/v1/cards/{cid}/run")
     assert resp.status_code == 200
-    assert resp.json()["data"]["status"] == "failed"
+    body = resp.json()
+    assert body["data"]["status"] == "failed"
+
+
+async def test_run_agent_failure_does_not_leak_raw_error(client, monkeypatch) -> None:
+    from app.services.agents.ideation import IdeationAgent
+
+    async def boom(self, raw_idea: str):
+        raise RuntimeError("traceback interno com /caminho/absoluto/secreto")
+
+    monkeypatch.setattr(IdeationAgent, "run", boom)
+    _, cid = await _seed_card_in_column(client, "backlog")
+    resp = await client.post(f"/api/v1/cards/{cid}/run")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    # O envelope NÃO expõe o str(exc) cru — vazamento interno mitigado.
+    assert "/caminho/absoluto/secreto" not in data["error"]
+    assert "traceback interno" not in data["error"]
+    # Mensagem genérica + request_id preservados para rastreabilidade.
+    assert data["request_id"]
+    assert data["error"] == "Erro interno. Consulte o request_id para rastreabilidade."
 
 
 async def test_run_reviewer_fail_returns_to_production(client, monkeypatch) -> None:

@@ -14,9 +14,25 @@ Regras inegociáveis:
 from datetime import datetime, timezone
 from typing import Any
 
+from app.core.exceptions import AppError
+
 
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+def sanitize_error(exc: Exception) -> str:
+    """Converte detalhes de erro internos em mensagem segura para o envelope.
+
+    - AppError (erros de domínio esperados): expõe a própria mensagem — segura
+      por design e útil para o cliente distinguir falhas conhecidas.
+    - Exceções genéricas (RuntimeError, KeyError, ...): NÃO vazam o str(exc) cru
+      (que pode conter stack/privados/paths); retornam mensagem genérica. O
+      detalhe real fica no log do servidor (logger.error).
+    """
+    if isinstance(exc, AppError):
+        return exc.message
+    return "Erro interno. Consulte o request_id para rastreabilidade."
 
 
 def success_envelope(data: Any, request_id: str) -> dict[str, Any]:

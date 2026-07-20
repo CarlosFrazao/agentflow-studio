@@ -6,6 +6,7 @@ falha graciosamente com SandboxResult(success=False) em vez de quebrar o app.
 """
 
 from app.core.logging import get_logger
+from app.core.responses import sanitize_error
 from app.sandbox.base import SandboxBackend, SandboxResult
 
 logger = get_logger("aws_sandbox")
@@ -46,4 +47,6 @@ class AWSLambdaSandbox(SandboxBackend):
             )
         except Exception as exc:  # noqa: BLE001 - falha de infra deve degradar
             logger.warning("aws_sandbox_failed", error=str(exc))
-            return SandboxResult(success=False, stderr=str(exc), backend=self.name)
+            return SandboxResult(
+                success=False, stderr=sanitize_error(exc), backend=self.name
+            )
