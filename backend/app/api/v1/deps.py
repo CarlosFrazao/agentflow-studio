@@ -22,11 +22,24 @@ def get_request_id(request: Request) -> str:
 
 
 def get_current_user_id(request: Request) -> str:
-    """Extrai e valida o Bearer token; retorna o subject (user_id) ou 401."""
+    """Extrai e valida o token de acesso; retorna o subject (user_id) ou 401.
+
+    FEAT-008 (B10-1): aceita o token de duas fontes, nesta ordem:
+      1. Header ``Authorization: Bearer <token>`` (usado por WebSockets/agentes
+         e por clientes que ainda preferem Bearer).
+      2. Cookie ``af_token`` HttpOnly (setado em /auth/login|register|refresh).
+         O cookie é inacessível a ``document.cookie``, mitigando roubo de sessão
+         via XSS. O fallback mantém compatibilidade com o WS de share, que não
+         consegue enviar cookies sozinho e continua usando o token via query.
+    """
     header = request.headers.get("Authorization", "")
-    if not header.startswith("Bearer "):
+    token: str | None = None
+    if header.startswith("Bearer "):
+        token = header[len("Bearer ") :].strip()
+    if not token:
+        token = request.cookies.get("af_token")
+    if not token:
         raise UnauthorizedError("token de acesso ausente")
-    token = header[len("Bearer ") :].strip()
     user_id = decode_access_token(token)
     if user_id is None:
         raise UnauthorizedError("token invalido ou expirado")

@@ -4,7 +4,6 @@ import { Dashboard } from "./components/dashboard/Dashboard";
 import { ChatPanel } from "./components/conductor/ChatPanel";
 import { Login } from "./components/Login";
 import AppShell from "./components/layout/AppShell";
-import Toolbar from "./components/layout/Toolbar";
 import ToastContainer from "./components/ui/ToastContainer";
 import { OnboardingTour, isOnboardingDone } from "./components/onboarding/OnboardingTour";
 import { isLoggedIn } from "./auth";
@@ -35,6 +34,10 @@ export default function App() {
     }
   }, [authed]);
 
+  // Gate client-side é UX surface (FEAT-008): decide só o que renderizar.
+  // A fonte de verdade de autenticação é o backend (cookie HttpOnly / Bearer
+  // validado em get_current_user_id). Aqui usamos isLoggedIn() (token em
+  // memória) apenas para alternar entre Login e o board.
   if (!authed) {
     return <Login onSuccess={() => setAuthed(true)} />;
   }
@@ -43,7 +46,6 @@ export default function App() {
 
   return (
     <AppShell title={meta.title} subtitle={meta.subtitle}>
-      <Toolbar />
       {view === "dashboard" ? (
         <Dashboard />
       ) : view === "conductor" ? (

@@ -17,8 +17,12 @@ export function onSessionExpired(cb: () => void): void {
 }
 
 /* ---------- auth-aware fetch com interceptor de 401 + refresh ---------- */
-// Em runtime o access token fica em localStorage; o refresh token fica em
-// memória (ver auth.ts). Sem token, a API responde 401.
+// FEAT-008 (B10-1): o access token é enviado de duas formas:
+//   1. Cookie HttpOnly (backend Set-Cookie em /auth/*) via `credentials: "include"`
+//      — mitiga roubo de sessão por XSS (document.cookie não enxerga o cookie).
+//   2. Header `Authorization: Bearer` opcional (mantido para WebSockets/agentes
+//      e para clientes que não suportam cookie). O backend aceita ambos.
+// O refresh token fica em memória (ver auth.ts). Sem token, a API responde 401.
 async function apiFetch(path: string, opts: RequestInit = {}): Promise<unknown> {
   return apiFetchOnce(path, opts, false);
 }
@@ -33,7 +37,11 @@ async function apiFetchOnce(
   const t = getToken();
   if (t) headers.set("Authorization", `Bearer ${t}`);
   if (opts.body) headers.set("Content-Type", "application/json");
-  const resp = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+  const resp = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers,
+    credentials: "include",
+  });
 
   if (resp.status === 401 && !retried && getRefreshToken()) {
     // Tenta renovar o access token uma única vez e refaz a request.

@@ -122,3 +122,57 @@ async def test_login_nonexistent_equalizes_timing(anon_client: AsyncClient) -> N
     )
     assert none_resp.status_code == 401
     assert none_resp.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+async def test_login_sets_httponly_cookie(anon_client: AsyncClient) -> None:
+    """FEAT-008 (B10-1): login emite cookie af_token HttpOnly+SameSite=strict."""
+    reg = await _register(anon_client, email="cookie@example.com", password="pw123456")
+    token = reg.json()["data"]["access_token"]
+
+    login_resp = await anon_client.post(
+        f"{API}/auth/login",
+        json={"email": "cookie@example.com", "password": "pw123456"},
+    )
+    assert login_resp.status_code == 200
+
+    set_cookie = login_resp.headers.get("set-cookie", "")
+    assert "af_token=" in set_cookie
+    assert "httponly" in set_cookie.lower()
+    assert "samesite=strict" in set_cookie.lower()
+    # O cookie deve carregar exatamente o access token emitido.
+    assert token.split(".")[0] in set_cookie
+
+
+async def test_protected_endpoint_accepts_auth_cookie(anon_client: AsyncClient) -> None:
+    """FEAT-008: o guard aceita o cookie af_token (sem Bearer header)."""
+    await _register(anon_client, email="cookieuser@example.com", password="pw123456")
+    login_resp = await anon_client.post(
+        f"{API}/auth/login",
+        json={"email": "cookieuser@example.com", "password": "pw123456"},
+    )
+    assert login_resp.status_code == 200
+    set_cookie = login_resp.headers.get("set-cookie", "")
+    cookie_header = set_cookie.split(";")[0]  # "af_token=<jwt>"
+
+    resp = await anon_client.get(f"{API}/projects", headers={"Cookie": cookie_header})
+    assert resp.status_code == 200
+
+
+async def test_logout_clears_auth_cookie(anon_client: AsyncClient) -> None:
+    """FEAT-008: POST /auth/logout expira o cookie HttpOnly de auth."""
+    await _register(anon_client, email="logout@example.com", password="pw123456")
+    login_resp = await anon_client.post(
+        f"{API}/auth/login",
+        json={"email": "logout@example.com", "password": "pw123456"},
+    )
+    cookie_header = login_resp.headers.get("set-cookie", "").split(";")[0]
+
+    resp = await anon_client.post(
+        f"{API}/auth/logout",
+        headers={"Cookie": cookie_header},
+    )
+    assert resp.status_code == 200
+    cleared = resp.headers.get("set-cookie", "")
+    # delete_cookie expira via Max-Age=0 / Expires já passada.
+    assert "af_token=" in cleared
+    assert "max-age=0" in cleared.lower() or "expires=" in cleared.lower()

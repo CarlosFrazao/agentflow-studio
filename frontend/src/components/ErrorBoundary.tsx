@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { clearToken } from "../auth";
+import { logout } from "../auth";
 
 interface Props {
   children: ReactNode;
@@ -46,8 +46,8 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   };
 
-  handleReload = (): void => {
-    clearToken();
+  handleReload = async (): Promise<void> => {
+    await logout();
     window.location.reload();
   };
 
